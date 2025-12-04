@@ -279,18 +279,26 @@ export const StudentCoursesPage = () => {
 };
 
 export const StudentLiveRoom = ({ user }: { user: User }) => {
-    const { isLive, topic, viewerCount, sendMessage, chatMessages, remoteStream, joinSession, checkStatus } = useLiveSession();
+    const { isLive, topic, viewerCount, sendMessage, chatMessages, remoteStream, joinSession, leaveSession, checkStatus } = useLiveSession();
     const [message, setMessage] = useState("");
     const navigate = useNavigate();
     const remoteVideoRef = useRef<HTMLVideoElement>(null);
+    const [isChatOpen, setIsChatOpen] = useState(true);
 
-    // Auto-join when becoming live if not already joined
+    // Auto-join on mount, cleanup on unmount
     useEffect(() => {
+        // Only join if live and we don't have a stream yet
         if (isLive && !remoteStream) {
             joinSession();
         }
-    }, [isLive, joinSession, remoteStream]);
 
+        // Cleanup on unmount (navigation away)
+        return () => {
+           leaveSession();
+        };
+    }, [isLive]); // Dependency on isLive allows auto-rejoin if status flips back
+
+    // Attach stream to video element
     useEffect(() => {
         if (remoteStream && remoteVideoRef.current) {
             remoteVideoRef.current.srcObject = remoteStream;
@@ -315,20 +323,18 @@ export const StudentLiveRoom = ({ user }: { user: User }) => {
                          <div className="absolute top-0 right-0 w-3 h-3 bg-brand-500 rounded-full animate-ping"></div>
                          <Video className="w-12 h-12 text-brand-500" />
                     </div>
-                    <h2 className="text-3xl font-bold text-white mb-2">{topic}</h2>
-                    <p className="text-brand-200 mb-8 font-medium">Waiting for host to start the class...</p>
+                    <h2 className="text-3xl font-bold text-white mb-2">{topic !== "Waiting for class..." ? "Class Ended" : "Waiting for Class"}</h2>
+                    <p className="text-brand-200 mb-8 font-medium">
+                        {topic !== "Waiting for class..." ? "The live session has ended." : "Waiting for host to start the class..."}
+                    </p>
                     
-                    <div className="flex items-center justify-center gap-2 text-sm text-gray-400 mb-8">
-                        <Users className="w-4 h-4" /> 
-                        <span>{viewerCount} Students Waiting</span>
-                    </div>
+                    {topic === "Waiting for class..." && (
+                        <div className="flex items-center justify-center gap-2 text-sm text-gray-400 mb-8">
+                            <Users className="w-4 h-4" /> 
+                            <span>{viewerCount} Students Waiting</span>
+                        </div>
+                    )}
 
-                    <div className="flex justify-center gap-2">
-                         <span className="w-2 h-2 bg-white rounded-full animate-bounce delay-75"></span>
-                         <span className="w-2 h-2 bg-white rounded-full animate-bounce delay-150"></span>
-                         <span className="w-2 h-2 bg-white rounded-full animate-bounce delay-300"></span>
-                    </div>
-                    
                     <div className="flex flex-col gap-4 mt-8">
                         <button onClick={checkStatus} className="bg-brand-600/80 hover:bg-brand-600 text-white px-6 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 shadow-lg transition">
                             <RefreshCw className="w-4 h-4" /> Refresh Status
@@ -352,11 +358,10 @@ export const StudentLiveRoom = ({ user }: { user: User }) => {
                              ref={remoteVideoRef} 
                              autoPlay 
                              playsInline 
-                             // FULL-SCREEN FOR STUDENTS: Changed from object-cover to fixed inset-0 z-10
                              className="w-full h-full object-cover fixed inset-0 z-10 bg-black" 
                           />
                       ) : (
-                          <div className="absolute inset-0 flex items-center justify-center text-gray-500">
+                          <div className="absolute inset-0 flex items-center justify-center text-gray-500 bg-black z-10">
                              <div className="text-center">
                                  <div className="w-10 h-10 border-2 border-brand-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
                                  <p>Connecting to Stream...</p>
@@ -364,7 +369,7 @@ export const StudentLiveRoom = ({ user }: { user: User }) => {
                           </div>
                       )}
                       
-                      {/* Controls Overlay - Positioned above video (z-20) */}
+                      {/* Controls Overlay */}
                       <div className="absolute top-4 left-4 flex gap-2 z-20">
                            <div className="bg-red-600 text-white px-3 py-1 rounded text-xs font-bold flex items-center gap-2 shadow-lg">
                                 <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span> LIVE
@@ -374,39 +379,19 @@ export const StudentLiveRoom = ({ user }: { user: User }) => {
                            </div>
                       </div>
                       
-                      {/* Info Overlay (z-20) */}
-                      <div className="absolute bottom-0 left-0 right-0 p-8 bg-gradient-to-t from-black/90 via-black/50 to-transparent opacity-0 group-hover:opacity-100 transition duration-300 z-20">
-                           <div className="flex items-center justify-between">
-                                <div className="text-white">
-                                     <h3 className="font-bold text-2xl mb-1">{topic}</h3>
-                                     <p className="text-sm text-gray-300">Tanaka Sensei</p>
-                                </div>
-                                <div className="flex gap-4">
-                                     <button className="bg-white/10 hover:bg-white/20 p-3 rounded-full text-white backdrop-blur-sm transition"><MicOff className="w-6 h-6" /></button>
-                                     <button className="bg-white/10 hover:bg-white/20 p-3 rounded-full text-white backdrop-blur-sm transition"><Hand className="w-6 h-6" /></button>
-                                </div>
-                           </div>
+                      <div className="absolute bottom-4 right-4 z-40">
+                          <button onClick={() => setIsChatOpen(!isChatOpen)} className="bg-dark-900/80 p-3 rounded-full text-white hover:bg-brand-600 transition">
+                              <MessageCircle className="w-6 h-6" />
+                          </button>
                       </div>
-                 </div>
-                 
-                 {/* This bottom bar will be hidden under video if video is full screen fixed, 
-                     but we keep it for structure or if user exits full screen (future implementation) */}
-                 <div className="bg-dark-800 p-4 rounded-xl border border-dark-700 flex justify-between items-center relative z-0 hidden">
-                     <div className="flex gap-4">
-                         <button className="text-gray-400 hover:text-white text-sm font-bold flex items-center gap-2 bg-dark-900 px-4 py-2 rounded-lg"><Download className="w-4 h-4" /> Materials</button>
-                         <button className="text-gray-400 hover:text-white text-sm font-bold flex items-center gap-2 bg-dark-900 px-4 py-2 rounded-lg"><AlertCircle className="w-4 h-4" /> Report Issue</button>
-                     </div>
-                     <button onClick={() => navigate('/student/courses')} className="bg-red-900/20 text-red-500 hover:bg-red-900/40 px-6 py-2 rounded-lg font-bold text-sm transition border border-red-500/20">
-                         Leave Class
-                     </button>
                  </div>
              </div>
 
              {/* Chat Sidebar - Floats on top (z-30) */}
-             <div className="w-96 bg-dark-900/90 backdrop-blur-md border-l border-white/10 flex flex-col overflow-hidden shadow-2xl fixed right-0 top-0 bottom-0 z-30 transform translate-x-full group-hover:translate-x-0 transition duration-300">
+             <div className={`w-96 bg-dark-900/90 backdrop-blur-md border-l border-white/10 flex flex-col overflow-hidden shadow-2xl fixed right-0 top-0 bottom-0 z-30 transition-transform duration-300 ${isChatOpen ? 'translate-x-0' : 'translate-x-full'}`}>
                  <div className="p-4 border-b border-white/10 bg-black/20 flex justify-between items-center pt-20">
                      <h3 className="font-bold text-white flex items-center gap-2"><MessageCircle className="w-4 h-4" /> Live Chat</h3>
-                     <span className="text-xs text-gray-400">Slow Mode On</span>
+                     <button onClick={() => setIsChatOpen(false)} className="text-gray-400 hover:text-white"><ChevronRight className="w-5 h-5" /></button>
                  </div>
                  
                  <div className="flex-1 overflow-y-auto p-4 space-y-4">
