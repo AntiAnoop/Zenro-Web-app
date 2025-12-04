@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Users, BookOpen, Clock, Plus, Video, 
   MessageSquare, BarChart2, Calendar, FileText, 
@@ -274,8 +274,7 @@ export const TeacherReportsPage = () => {
 };
 
 export const LiveClassConsole = () => {
-    // USE GLOBAL CONTEXT INSTEAD OF LOCAL STATE
-    const { isLive, topic, viewerCount, startSession, endSession, sendMessage, chatMessages } = useLiveSession();
+    const { isLive, topic, viewerCount, startSession, endSession, sendMessage, chatMessages, localStream } = useLiveSession();
     
     const [transcript, setTranscript] = useState("");
     const [summary, setSummary] = useState("");
@@ -283,6 +282,14 @@ export const LiveClassConsole = () => {
     const [micOn, setMicOn] = useState(true);
     const [camOn, setCamOn] = useState(true);
     const [newMessage, setNewMessage] = useState("");
+    
+    const localVideoRef = useRef<HTMLVideoElement>(null);
+
+    useEffect(() => {
+        if (localStream && localVideoRef.current) {
+            localVideoRef.current.srcObject = localStream;
+        }
+    }, [localStream]);
 
     // Mock transcript growth
     useEffect(() => {
@@ -303,7 +310,7 @@ export const LiveClassConsole = () => {
 
     const handleEndClass = async () => {
         setIsGenerating(true);
-        endSession(); // Updates Context
+        endSession(); 
         try {
             const result = await generateClassSummary(transcript || "We discussed Japanese grammar.");
             setSummary(result);
@@ -361,9 +368,17 @@ export const LiveClassConsole = () => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 min-h-0">
                 {/* Video Feed Area */}
                 <div className="lg:col-span-2 bg-black rounded-xl border border-dark-700 relative overflow-hidden flex items-center justify-center group">
-                    {isLive && camOn ? (
+                    {localStream ? (
                         <div className="relative w-full h-full">
-                            <img src="https://images.unsplash.com/photo-1544967082-d9d3f661eb1d?auto=format&fit=crop&q=80&w=1200" alt="Stream" className="w-full h-full object-cover opacity-80" />
+                            {/* Real Local Video Feed */}
+                            <video 
+                                ref={localVideoRef} 
+                                autoPlay 
+                                muted 
+                                playsInline 
+                                className="w-full h-full object-cover" 
+                            />
+                            
                             <div className="absolute top-4 right-4 bg-brand-600 text-white px-3 py-1 rounded text-sm font-bold flex items-center gap-2">
                                 <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span> LIVE
                             </div>
@@ -374,7 +389,7 @@ export const LiveClassConsole = () => {
                     ) : (
                         <div className="text-center">
                             <Video className="w-16 h-16 text-dark-700 mx-auto mb-4" />
-                            <p className="text-dark-500">{isLive ? "Camera Off" : "Class is Offline"}</p>
+                            <p className="text-dark-500">{isLive ? "Starting Camera..." : "Class is Offline"}</p>
                         </div>
                     )}
                 </div>

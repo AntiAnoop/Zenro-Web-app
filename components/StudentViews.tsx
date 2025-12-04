@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Play, Clock, Calendar, AlertCircle, CheckCircle, 
   CreditCard, Download, User as UserIcon, MapPin, 
@@ -279,9 +279,23 @@ export const StudentCoursesPage = () => {
 };
 
 export const StudentLiveRoom = ({ user }: { user: User }) => {
-    const { isLive, topic, viewerCount, sendMessage, chatMessages } = useLiveSession();
+    const { isLive, topic, viewerCount, sendMessage, chatMessages, remoteStream, joinSession } = useLiveSession();
     const [message, setMessage] = useState("");
     const navigate = useNavigate();
+    const remoteVideoRef = useRef<HTMLVideoElement>(null);
+
+    // Auto-join when becoming live if not already joined
+    useEffect(() => {
+        if (isLive && !remoteStream) {
+            joinSession();
+        }
+    }, [isLive, joinSession, remoteStream]);
+
+    useEffect(() => {
+        if (remoteStream && remoteVideoRef.current) {
+            remoteVideoRef.current.srcObject = remoteStream;
+        }
+    }, [remoteStream]);
 
     const handleSend = (e: React.FormEvent) => {
         e.preventDefault();
@@ -328,7 +342,22 @@ export const StudentLiveRoom = ({ user }: { user: User }) => {
         <div className="h-[calc(100vh-2rem)] flex gap-6 animate-fade-in">
              <div className="flex-1 flex flex-col space-y-4">
                  <div className="relative flex-1 bg-black rounded-xl border border-dark-700 overflow-hidden shadow-2xl group">
-                      <img src="https://images.unsplash.com/photo-1544967082-d9d3f661eb1d?auto=format&fit=crop&q=80&w=1200" alt="Stream" className="w-full h-full object-cover" />
+                      {remoteStream ? (
+                          <video 
+                             ref={remoteVideoRef} 
+                             autoPlay 
+                             playsInline 
+                             className="w-full h-full object-cover" 
+                          />
+                      ) : (
+                          <div className="absolute inset-0 flex items-center justify-center text-gray-500">
+                             <div className="text-center">
+                                 <div className="w-10 h-10 border-2 border-brand-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+                                 <p>Connecting to Stream...</p>
+                             </div>
+                          </div>
+                      )}
+                      
                       <div className="absolute top-4 left-4 flex gap-2">
                            <div className="bg-red-600 text-white px-3 py-1 rounded text-xs font-bold flex items-center gap-2 shadow-lg">
                                 <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span> LIVE
