@@ -1,13 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Play, Clock, Calendar, AlertCircle, CheckCircle, 
   CreditCard, Download, User as UserIcon, MapPin, 
   Phone, Mail, Shield, BookOpen, ChevronRight, Lock,
   Video, BarChart2, ListTodo, FileText, Activity, Briefcase,
-  Languages, GraduationCap, Globe, Zap
+  Languages, GraduationCap, Globe, Zap, MessageCircle, Send, Users, Mic, MicOff, Hand
 } from 'lucide-react';
 import { User, Course, FeeRecord, Transaction, TestResult, ActivityItem } from '../types';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, Legend } from 'recharts';
+import { useNavigate } from 'react-router-dom';
+import { useLiveSession } from '../context/LiveContext';
 
 // --- MOCK DATA (JAPANESE CONTEXT) ---
 
@@ -196,7 +198,9 @@ export const StudentDashboardHome = () => {
 };
 
 export const StudentCoursesPage = () => {
-  const liveCourse = MOCK_COURSES.find(c => c.isLive);
+  const navigate = useNavigate();
+  const { isLive, topic } = useLiveSession();
+  const liveCourse = MOCK_COURSES.find(c => c.isLive); // Ideally match by ID from context, but mocking for now
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -211,15 +215,18 @@ export const StudentCoursesPage = () => {
                     <div className="relative w-full md:w-64 aspect-video bg-black rounded-lg overflow-hidden border border-brand-500/50 shadow-[0_0_30px_rgba(188,0,45,0.3)]">
                         <img src={liveCourse.thumbnail} alt="Live" className="w-full h-full object-cover opacity-70" />
                         <div className="absolute inset-0 flex items-center justify-center">
-                            <div className="flex items-center gap-2 bg-brand-600 text-white px-4 py-1.5 rounded-full font-bold text-sm shadow-lg animate-pulse">
-                                <span className="w-2 h-2 bg-white rounded-full"></span> LIVE CLASS
+                            <div className={`flex items-center gap-2 px-4 py-1.5 rounded-full font-bold text-sm shadow-lg ${isLive ? 'bg-brand-600 text-white animate-pulse' : 'bg-gray-600 text-gray-200'}`}>
+                                <span className={`w-2 h-2 bg-white rounded-full ${isLive ? 'animate-pulse' : ''}`}></span> {isLive ? 'LIVE NOW' : 'WAITING ROOM'}
                             </div>
                         </div>
                     </div>
                     <div className="flex-1 text-center md:text-left">
-                        <h2 className="text-2xl font-bold text-white mb-1">{liveCourse.title}</h2>
+                        <h2 className="text-2xl font-bold text-white mb-1">{topic}</h2>
                         <p className="text-brand-200 mb-4 font-medium">Instructor: {liveCourse.instructor}</p>
-                        <button className="bg-brand-600 hover:bg-brand-500 text-white px-8 py-3 rounded-lg font-bold flex items-center gap-2 mx-auto md:mx-0 transition shadow-lg shadow-brand-900/40">
+                        <button 
+                            onClick={() => navigate('/student/live')}
+                            className="bg-brand-600 hover:bg-brand-500 text-white px-8 py-3 rounded-lg font-bold flex items-center gap-2 mx-auto md:mx-0 transition shadow-lg shadow-brand-900/40"
+                        >
                             <Video className="w-5 h-5" /> Join Classroom
                         </button>
                     </div>
@@ -269,6 +276,133 @@ export const StudentCoursesPage = () => {
         </div>
     </div>
   );
+};
+
+export const StudentLiveRoom = ({ user }: { user: User }) => {
+    const { isLive, topic, viewerCount, sendMessage, chatMessages } = useLiveSession();
+    const [message, setMessage] = useState("");
+    const navigate = useNavigate();
+
+    const handleSend = (e: React.FormEvent) => {
+        e.preventDefault();
+        if(message.trim()) {
+            sendMessage(user.name, message);
+            setMessage("");
+        }
+    }
+
+    if (!isLive) {
+        // Waiting Room UI
+        return (
+            <div className="h-full flex flex-col items-center justify-center space-y-8 animate-fade-in relative overflow-hidden">
+                <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1544967082-d9d3f661eb1d?auto=format&fit=crop&q=80&w=1200')] bg-cover bg-center blur-md opacity-20"></div>
+                <div className="relative z-10 bg-dark-800/80 backdrop-blur-xl p-12 rounded-2xl border border-dark-600 shadow-2xl text-center max-w-xl w-full">
+                    <div className="inline-block p-4 rounded-full bg-dark-900 border border-dark-700 mb-6 relative">
+                         <div className="absolute top-0 right-0 w-3 h-3 bg-brand-500 rounded-full animate-ping"></div>
+                         <Video className="w-12 h-12 text-brand-500" />
+                    </div>
+                    <h2 className="text-3xl font-bold text-white mb-2">{topic}</h2>
+                    <p className="text-brand-200 mb-8 font-medium">Waiting for host to start the class...</p>
+                    
+                    <div className="flex items-center justify-center gap-2 text-sm text-gray-400 mb-8">
+                        <Users className="w-4 h-4" /> 
+                        <span>{viewerCount} Students Waiting</span>
+                    </div>
+
+                    <div className="flex justify-center gap-2">
+                         <span className="w-2 h-2 bg-white rounded-full animate-bounce delay-75"></span>
+                         <span className="w-2 h-2 bg-white rounded-full animate-bounce delay-150"></span>
+                         <span className="w-2 h-2 bg-white rounded-full animate-bounce delay-300"></span>
+                    </div>
+                    
+                    <button onClick={() => navigate('/student/courses')} className="mt-8 text-gray-500 hover:text-white text-sm underline">
+                        Leave Waiting Room
+                    </button>
+                </div>
+            </div>
+        );
+    }
+
+    // Live UI
+    return (
+        <div className="h-[calc(100vh-2rem)] flex gap-6 animate-fade-in">
+             <div className="flex-1 flex flex-col space-y-4">
+                 <div className="relative flex-1 bg-black rounded-xl border border-dark-700 overflow-hidden shadow-2xl group">
+                      <img src="https://images.unsplash.com/photo-1544967082-d9d3f661eb1d?auto=format&fit=crop&q=80&w=1200" alt="Stream" className="w-full h-full object-cover" />
+                      <div className="absolute top-4 left-4 flex gap-2">
+                           <div className="bg-red-600 text-white px-3 py-1 rounded text-xs font-bold flex items-center gap-2 shadow-lg">
+                                <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span> LIVE
+                           </div>
+                           <div className="bg-black/60 backdrop-blur text-white px-3 py-1 rounded text-xs flex items-center gap-2">
+                                <Users className="w-3 h-3" /> {viewerCount}
+                           </div>
+                      </div>
+                      
+                      {/* Controls Overlay */}
+                      <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/90 to-transparent opacity-0 group-hover:opacity-100 transition duration-300">
+                           <div className="flex items-center justify-between">
+                                <div className="text-white">
+                                     <h3 className="font-bold">{topic}</h3>
+                                     <p className="text-xs text-gray-400">Tanaka Sensei</p>
+                                </div>
+                                <div className="flex gap-4">
+                                     <button className="text-white hover:text-brand-500"><MicOff className="w-5 h-5" /></button>
+                                     <button className="text-white hover:text-brand-500"><Hand className="w-5 h-5" /></button>
+                                </div>
+                           </div>
+                      </div>
+                 </div>
+                 
+                 <div className="bg-dark-800 p-4 rounded-xl border border-dark-700 flex justify-between items-center">
+                     <div className="flex gap-4">
+                         <button className="text-gray-400 hover:text-white text-sm font-bold flex items-center gap-2 bg-dark-900 px-4 py-2 rounded-lg"><Download className="w-4 h-4" /> Materials</button>
+                         <button className="text-gray-400 hover:text-white text-sm font-bold flex items-center gap-2 bg-dark-900 px-4 py-2 rounded-lg"><AlertCircle className="w-4 h-4" /> Report Issue</button>
+                     </div>
+                     <button onClick={() => navigate('/student/courses')} className="bg-red-900/20 text-red-500 hover:bg-red-900/40 px-6 py-2 rounded-lg font-bold text-sm transition border border-red-500/20">
+                         Leave Class
+                     </button>
+                 </div>
+             </div>
+
+             <div className="w-96 bg-dark-800 rounded-xl border border-dark-700 flex flex-col overflow-hidden shadow-lg">
+                 <div className="p-4 border-b border-dark-700 bg-dark-900/50 flex justify-between items-center">
+                     <h3 className="font-bold text-white flex items-center gap-2"><MessageCircle className="w-4 h-4" /> Live Chat</h3>
+                     <span className="text-xs text-gray-500">Slow Mode On</span>
+                 </div>
+                 
+                 <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                     {chatMessages.map((m, i) => (
+                         <div key={i} className="animate-fade-in-up">
+                             <div className="flex items-baseline justify-between mb-1">
+                                 <span className={`text-xs font-bold ${m.user === "Tanaka Sensei" ? 'text-brand-500' : m.user === user.name ? 'text-blue-400' : m.user === "SYSTEM" ? 'text-accent-gold' : 'text-gray-300'}`}>
+                                     {m.user}
+                                 </span>
+                                 <span className="text-[10px] text-gray-600">{m.timestamp}</span>
+                             </div>
+                             <p className={`text-sm rounded-lg p-2 ${m.user === "SYSTEM" ? 'bg-accent-gold/10 text-accent-gold text-xs italic' : 'bg-dark-900 text-gray-200'}`}>
+                                 {m.text}
+                             </p>
+                         </div>
+                     ))}
+                 </div>
+
+                 <form onSubmit={handleSend} className="p-4 bg-dark-900/50 border-t border-dark-700">
+                     <div className="relative">
+                         <input 
+                            type="text" 
+                            value={message}
+                            onChange={(e) => setMessage(e.target.value)}
+                            placeholder="Ask a question..." 
+                            className="w-full bg-dark-900 border border-dark-600 text-white pl-4 pr-10 py-3 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none placeholder-gray-500 text-sm"
+                         />
+                         <button type="submit" className="absolute right-2 top-2 p-1.5 bg-brand-600 hover:bg-brand-500 text-white rounded-lg transition">
+                             <Send className="w-4 h-4" />
+                         </button>
+                     </div>
+                 </form>
+             </div>
+        </div>
+    );
 };
 
 export const StudentTestsPage = () => {

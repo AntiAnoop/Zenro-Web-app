@@ -3,9 +3,10 @@ import { HashRouter as Router, Routes, Route, Navigate, Link, useLocation } from
 import { BookOpen, BarChart2, ShieldAlert, Layout, LogOut, Play, User as UserIcon, Settings, MessageSquare, Video, CreditCard, Layers, Book, ListTodo, FileText, Globe, DollarSign, Users } from 'lucide-react';
 import { User, UserRole } from './types';
 import { ExamPortal } from './components/ExamPortal';
-import { StudentDashboardHome, StudentFeesPage, StudentProfilePage, StudentCoursesPage, StudentTestsPage, StudentActivityPage } from './components/StudentViews';
+import { StudentDashboardHome, StudentFeesPage, StudentProfilePage, StudentCoursesPage, StudentTestsPage, StudentActivityPage, StudentLiveRoom } from './components/StudentViews';
 import { TeacherDashboardHome, TeacherCoursesPage, TeacherAssignmentsPage, TeacherReportsPage, LiveClassConsole } from './components/TeacherViews';
-import { AdminDashboard, AdminUserManagement, AdminFinancials } from './components/AdminViews'; // Reusing TeacherCoursesPage or creating new if needed, using AdminViews exports
+import { AdminDashboard, AdminUserManagement, AdminFinancials } from './components/AdminViews';
+import { LiveProvider } from './context/LiveContext';
 
 // --- MOCK DATA ---
 const CREDENTIALS: Record<string, {pass: string, role: UserRole, name: string, id: string}> = {
@@ -258,55 +259,58 @@ export default function App() {
   }
 
   return (
-    <Router>
-      <div className="flex h-screen bg-dark-900 text-white font-sans selection:bg-brand-500 selection:text-white">
-        <Sidebar user={user} onLogout={() => setUser(null)} />
-        <main className="ml-64 flex-1 overflow-auto p-8 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] bg-fixed">
-          <Routes>
-            <Route path="/" element={
-               user.role === UserRole.STUDENT ? <Navigate to="/student/dashboard" /> : 
-               user.role === UserRole.TEACHER ? <Navigate to="/teacher/dashboard" /> : <Navigate to="/admin/dashboard" />
-            } />
-            
-            {/* Student Routes */}
-            <Route path="/student/dashboard" element={<StudentDashboardHome />} />
-            <Route path="/student/courses" element={<StudentCoursesPage />} />
-            <Route path="/student/tests" element={<StudentTestsPage />} />
-            <Route path="/student/activities" element={<StudentActivityPage />} />
-            <Route path="/student/fees" element={<StudentFeesPage />} />
-            <Route path="/student/profile" element={<StudentProfilePage user={user} />} />
-            
-            <Route path="/exam-intro" element={
-               <div className="p-8 flex justify-center items-center h-full">
-                   <div className="bg-dark-800 p-8 rounded-xl max-w-md text-center border border-dark-700">
-                       <ShieldAlert className="w-16 h-16 text-brand-500 mx-auto mb-4" />
-                       <h1 className="text-2xl font-bold mb-2">JLPT Mock Exam</h1>
-                       <p className="text-gray-400 mb-6">Duration: 60 mins • N4 Level</p>
-                       <button onClick={() => setIsExamMode(true)} className="w-full bg-brand-600 py-3 rounded text-white font-bold hover:bg-brand-500">
-                           Start Examination
-                       </button>
-                   </div>
-               </div>
-            } />
-            
-            {/* Teacher Routes */}
-            <Route path="/teacher/dashboard" element={<TeacherDashboardHome />} />
-            <Route path="/teacher/courses" element={<TeacherCoursesPage />} />
-            <Route path="/teacher/assignments" element={<TeacherAssignmentsPage />} />
-            <Route path="/teacher/reports" element={<TeacherReportsPage />} />
-            <Route path="/teacher/live" element={<LiveClassConsole />} />
+    <LiveProvider>
+      <Router>
+        <div className="flex h-screen bg-dark-900 text-white font-sans selection:bg-brand-500 selection:text-white">
+          <Sidebar user={user} onLogout={() => setUser(null)} />
+          <main className="ml-64 flex-1 overflow-auto p-8 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] bg-fixed">
+            <Routes>
+              <Route path="/" element={
+                 user.role === UserRole.STUDENT ? <Navigate to="/student/dashboard" /> : 
+                 user.role === UserRole.TEACHER ? <Navigate to="/teacher/dashboard" /> : <Navigate to="/admin/dashboard" />
+              } />
+              
+              {/* Student Routes */}
+              <Route path="/student/dashboard" element={<StudentDashboardHome />} />
+              <Route path="/student/courses" element={<StudentCoursesPage />} />
+              <Route path="/student/live" element={<StudentLiveRoom user={user} />} />
+              <Route path="/student/tests" element={<StudentTestsPage />} />
+              <Route path="/student/activities" element={<StudentActivityPage />} />
+              <Route path="/student/fees" element={<StudentFeesPage />} />
+              <Route path="/student/profile" element={<StudentProfilePage user={user} />} />
+              
+              <Route path="/exam-intro" element={
+                 <div className="p-8 flex justify-center items-center h-full">
+                     <div className="bg-dark-800 p-8 rounded-xl max-w-md text-center border border-dark-700">
+                         <ShieldAlert className="w-16 h-16 text-brand-500 mx-auto mb-4" />
+                         <h1 className="text-2xl font-bold mb-2">JLPT Mock Exam</h1>
+                         <p className="text-gray-400 mb-6">Duration: 60 mins • N4 Level</p>
+                         <button onClick={() => setIsExamMode(true)} className="w-full bg-brand-600 py-3 rounded text-white font-bold hover:bg-brand-500">
+                             Start Examination
+                         </button>
+                     </div>
+                 </div>
+              } />
+              
+              {/* Teacher Routes */}
+              <Route path="/teacher/dashboard" element={<TeacherDashboardHome />} />
+              <Route path="/teacher/courses" element={<TeacherCoursesPage />} />
+              <Route path="/teacher/assignments" element={<TeacherAssignmentsPage />} />
+              <Route path="/teacher/reports" element={<TeacherReportsPage />} />
+              <Route path="/teacher/live" element={<LiveClassConsole />} />
 
-            {/* Admin Routes */}
-            <Route path="/admin/dashboard" element={<AdminDashboard />} />
-            <Route path="/admin/users" element={<AdminUserManagement />} />
-            <Route path="/admin/finance" element={<AdminFinancials />} />
-            <Route path="/admin/courses" element={<TeacherCoursesPage />} /> {/* Reusing for demo, ideally separate */}
-            <Route path="/admin/settings" element={<div className="text-center p-12 text-gray-500">Settings Module Loading...</div>} />
+              {/* Admin Routes */}
+              <Route path="/admin/dashboard" element={<AdminDashboard />} />
+              <Route path="/admin/users" element={<AdminUserManagement />} />
+              <Route path="/admin/finance" element={<AdminFinancials />} />
+              <Route path="/admin/courses" element={<TeacherCoursesPage />} />
+              <Route path="/admin/settings" element={<div className="text-center p-12 text-gray-500">Settings Module Loading...</div>} />
 
-            <Route path="*" element={<Navigate to="/" />} />
-          </Routes>
-        </main>
-      </div>
-    </Router>
+              <Route path="*" element={<Navigate to="/" />} />
+            </Routes>
+          </main>
+        </div>
+      </Router>
+    </LiveProvider>
   );
 }

@@ -5,7 +5,7 @@ let aiClient: GoogleGenAI | null = null;
 const getAiClient = (): GoogleGenAI => {
   if (!aiClient) {
     // The API key must be obtained exclusively from the environment variable process.env.API_KEY.
-    aiClient = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    aiClient = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
   }
   return aiClient;
 };

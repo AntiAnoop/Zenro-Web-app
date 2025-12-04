@@ -8,6 +8,7 @@ import {
 import { Course, Assignment, StudentPerformance } from '../types';
 import { generateClassSummary } from '../services/geminiService';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { useLiveSession } from '../context/LiveContext';
 
 // --- MOCK DATA (TEACHER) ---
 
@@ -273,17 +274,15 @@ export const TeacherReportsPage = () => {
 };
 
 export const LiveClassConsole = () => {
-    const [isLive, setIsLive] = useState(false);
+    // USE GLOBAL CONTEXT INSTEAD OF LOCAL STATE
+    const { isLive, topic, viewerCount, startSession, endSession, sendMessage, chatMessages } = useLiveSession();
+    
     const [transcript, setTranscript] = useState("");
     const [summary, setSummary] = useState("");
     const [isGenerating, setIsGenerating] = useState(false);
     const [micOn, setMicOn] = useState(true);
     const [camOn, setCamOn] = useState(true);
-
-    const [messages, setMessages] = useState<{user: string, text: string}[]>([
-        { user: "Student A", text: "Sensei, what is the reading for that Kanji?" },
-        { user: "Student B", text: "Is 'Tabemasu' polite form?" },
-    ]);
+    const [newMessage, setNewMessage] = useState("");
 
     // Mock transcript growth
     useEffect(() => {
@@ -303,8 +302,8 @@ export const LiveClassConsole = () => {
     }, [isLive]);
 
     const handleEndClass = async () => {
-        setIsLive(false);
         setIsGenerating(true);
+        endSession(); // Updates Context
         try {
             const result = await generateClassSummary(transcript || "We discussed Japanese grammar.");
             setSummary(result);
@@ -315,14 +314,22 @@ export const LiveClassConsole = () => {
         }
     };
 
+    const handleSendMessage = (e: React.FormEvent) => {
+        e.preventDefault();
+        if(newMessage.trim()) {
+            sendMessage("Tanaka Sensei", newMessage);
+            setNewMessage("");
+        }
+    }
+
     return (
         <div className="h-[calc(100vh-2rem)] flex flex-col space-y-4 animate-fade-in">
             <div className="flex items-center justify-between bg-dark-800 p-4 rounded-xl border border-dark-700">
                 <div className="flex items-center gap-4">
                      <div className={`w-3 h-3 rounded-full ${isLive ? 'bg-brand-500 animate-pulse' : 'bg-gray-500'}`}></div>
                      <div>
-                         <h2 className="text-xl font-bold text-white">JLPT N4 Grammar</h2>
-                         <p className="text-xs text-gray-400">Batch B-2024 • Live Session</p>
+                         <h2 className="text-xl font-bold text-white">{topic}</h2>
+                         <p className="text-xs text-gray-400">Batch B-2024 • {isLive ? "BROADCASTING" : "OFFLINE"}</p>
                      </div>
                 </div>
                 
@@ -340,8 +347,8 @@ export const LiveClassConsole = () => {
                      </div>
 
                     {!isLive ? (
-                        <button onClick={() => { setIsLive(true); setTranscript(""); setSummary(""); }} className="bg-brand-600 hover:bg-brand-500 text-white px-6 py-2 rounded-lg font-bold shadow-lg shadow-brand-900/50">
-                            Go Live
+                        <button onClick={() => startSession("JLPT N4 Grammar: The Te-Form")} className="bg-brand-600 hover:bg-brand-500 text-white px-6 py-2 rounded-lg font-bold shadow-lg shadow-brand-900/50 flex items-center gap-2">
+                             <Video className="w-4 h-4" /> Go Live
                         </button>
                     ) : (
                         <button onClick={handleEndClass} className="bg-red-600 hover:bg-red-500 text-white px-6 py-2 rounded-lg font-bold shadow-lg shadow-red-900/50">
@@ -361,7 +368,7 @@ export const LiveClassConsole = () => {
                                 <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span> LIVE
                             </div>
                             <div className="absolute bottom-4 left-4 bg-black/60 px-3 py-1 rounded text-white text-sm">
-                                24 Students
+                                {viewerCount} Students
                             </div>
                         </div>
                     ) : (
@@ -376,19 +383,26 @@ export const LiveClassConsole = () => {
                 <div className="bg-dark-800 rounded-xl border border-dark-700 flex flex-col overflow-hidden">
                     <div className="p-4 border-b border-dark-700 font-bold bg-dark-900/50">Class Chat</div>
                     <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                        {messages.map((m, i) => (
+                        {chatMessages.length === 0 && <p className="text-center text-gray-500 text-sm mt-4">No messages yet.</p>}
+                        {chatMessages.map((m, i) => (
                             <div key={i} className="text-sm">
                                 <div className="flex items-baseline justify-between mb-1">
-                                    <span className="font-bold text-brand-500">{m.user}</span>
-                                    <span className="text-[10px] text-gray-600">10:0{i} AM</span>
+                                    <span className={`font-bold ${m.user === "SYSTEM" ? 'text-accent-gold' : m.user === "Tanaka Sensei" ? 'text-brand-500' : 'text-white'}`}>{m.user}</span>
+                                    <span className="text-[10px] text-gray-600">{m.timestamp}</span>
                                 </div>
-                                <p className="text-gray-300 bg-dark-900 p-2 rounded-lg rounded-tl-none">{m.text}</p>
+                                <p className={`p-2 rounded-lg rounded-tl-none ${m.user === "SYSTEM" ? 'bg-accent-gold/10 text-accent-gold italic' : 'bg-dark-900 text-gray-300'}`}>{m.text}</p>
                             </div>
                         ))}
                     </div>
-                    <div className="p-4 border-t border-dark-700 bg-dark-900/30">
-                        <input type="text" placeholder="Type a message..." className="w-full bg-dark-900 border border-dark-700 rounded px-3 py-2 text-white focus:ring-1 focus:ring-brand-500 outline-none" />
-                    </div>
+                    <form onSubmit={handleSendMessage} className="p-4 border-t border-dark-700 bg-dark-900/30">
+                        <input 
+                            type="text" 
+                            value={newMessage}
+                            onChange={(e) => setNewMessage(e.target.value)}
+                            placeholder="Type a message..." 
+                            className="w-full bg-dark-900 border border-dark-700 rounded px-3 py-2 text-white focus:ring-1 focus:ring-brand-500 outline-none" 
+                        />
+                    </form>
                 </div>
             </div>
 
