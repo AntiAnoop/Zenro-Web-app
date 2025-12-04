@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
-import { BookOpen, BarChart2, ShieldAlert, Layout, LogOut, Play, User as UserIcon, Settings, MessageSquare, Video, CreditCard, Layers, Book, ListTodo, FileText, Globe, DollarSign, Users } from 'lucide-react';
+import { BookOpen, BarChart2, ShieldAlert, Layout, LogOut, Play, User as UserIcon, Settings, MessageSquare, Video, CreditCard, Layers, Book, ListTodo, FileText, Globe, DollarSign, Users, Zap } from 'lucide-react';
 import { User, UserRole } from './types';
 import { ExamPortal } from './components/ExamPortal';
 import { StudentDashboardHome, StudentFeesPage, StudentProfilePage, StudentCoursesPage, StudentTestsPage, StudentActivityPage, StudentLiveRoom } from './components/StudentViews';
@@ -52,6 +52,19 @@ const LoginScreen = ({ onLogin }: { onLogin: (user: User) => void }) => {
     }
   };
 
+  const loginAs = (id: string) => {
+    const account = CREDENTIALS[id];
+    if (account) {
+        onLogin({
+            id: account.id,
+            name: account.name,
+            role: account.role,
+            email: `${id}@zenro.jp`,
+            avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(account.name)}&background=BC002D&color=fff`
+        });
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const account = CREDENTIALS[identifier];
@@ -82,6 +95,21 @@ const LoginScreen = ({ onLogin }: { onLogin: (user: User) => void }) => {
         <h2 className="text-3xl font-bold text-white text-center mb-2 font-sans">ZENRO</h2>
         <p className="text-center text-gray-400 mb-8 tracking-widest text-xs uppercase">Japanese Language Institute</p>
         
+        {/* Quick Login Buttons */}
+        <div className="grid grid-cols-2 gap-3 mb-6">
+            <button onClick={() => loginAs('8888888888')} className="flex items-center justify-center gap-2 p-2 bg-dark-700 hover:bg-dark-600 rounded-lg text-xs font-bold text-white border border-dark-600 transition">
+                <Zap className="w-4 h-4 text-brand-500" /> Sensei Login
+            </button>
+            <button onClick={() => loginAs('9999999999')} className="flex items-center justify-center gap-2 p-2 bg-dark-700 hover:bg-dark-600 rounded-lg text-xs font-bold text-white border border-dark-600 transition">
+                <Zap className="w-4 h-4 text-blue-500" /> Student Login
+            </button>
+        </div>
+
+        <div className="relative mb-6">
+            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-dark-600"></div></div>
+            <div className="relative flex justify-center text-xs uppercase"><span className="bg-dark-800 px-2 text-gray-500">Or sign in with ID</span></div>
+        </div>
+        
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
             <label className="block text-sm font-medium text-gray-400 mb-2">Student ID / Number</label>
@@ -91,7 +119,7 @@ const LoginScreen = ({ onLogin }: { onLogin: (user: User) => void }) => {
               onChange={handleIdentifierChange}
               className="w-full bg-dark-900 border border-dark-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-brand-500 focus:outline-none placeholder-gray-600 transition"
               placeholder="Enter ID"
-              required
+              
             />
           </div>
           
@@ -104,7 +132,7 @@ const LoginScreen = ({ onLogin }: { onLogin: (user: User) => void }) => {
               onChange={(e) => setPassword(e.target.value)}
               className="w-full bg-dark-900 border border-dark-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-brand-500 focus:outline-none placeholder-gray-600 transition"
               placeholder="••••••••"
-              required
+              
             />
           </div>
 
@@ -117,13 +145,6 @@ const LoginScreen = ({ onLogin }: { onLogin: (user: User) => void }) => {
             Sign In (ログイン)
           </button>
         </form>
-        
-        <div className="mt-8 text-center text-xs text-gray-600">
-            <p>Demo Accounts:</p>
-            <p>Student: 9999999999</p>
-            <p>Sensei: 8888888888</p>
-            <p>Admin: 7777777777</p>
-        </div>
       </div>
     </div>
   );

@@ -274,7 +274,7 @@ export const TeacherReportsPage = () => {
 };
 
 export const LiveClassConsole = () => {
-    const { isLive, topic, viewerCount, startSession, endSession, sendMessage, chatMessages, localStream, toggleMic, toggleCamera } = useLiveSession();
+    const { isLive, topic, viewerCount, startSession, endSession, sendMessage, chatMessages, localStream, toggleMic, toggleCamera, enablePreview } = useLiveSession();
     
     const [transcript, setTranscript] = useState("");
     const [summary, setSummary] = useState("");
@@ -284,6 +284,11 @@ export const LiveClassConsole = () => {
     const [newMessage, setNewMessage] = useState("");
     
     const localVideoRef = useRef<HTMLVideoElement>(null);
+
+    // Auto-enable preview when entering console
+    useEffect(() => {
+        enablePreview();
+    }, []);
 
     useEffect(() => {
         if (localStream && localVideoRef.current) {
@@ -392,16 +397,18 @@ export const LiveClassConsole = () => {
                             />
                             
                             <div className="absolute top-4 right-4 bg-brand-600 text-white px-3 py-1 rounded text-sm font-bold flex items-center gap-2">
-                                <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span> LIVE
+                                <span className={`w-2 h-2 rounded-full ${isLive ? 'bg-white animate-pulse' : 'bg-gray-400'}`}></span> {isLive ? 'LIVE' : 'PREVIEW'}
                             </div>
-                            <div className="absolute bottom-4 left-4 bg-black/60 px-3 py-1 rounded text-white text-sm">
-                                {viewerCount} Students
-                            </div>
+                            {isLive && (
+                                <div className="absolute bottom-4 left-4 bg-black/60 px-3 py-1 rounded text-white text-sm">
+                                    {viewerCount} Students
+                                </div>
+                            )}
                         </div>
                     ) : (
                         <div className="text-center">
                             <Video className="w-16 h-16 text-dark-700 mx-auto mb-4" />
-                            <p className="text-dark-500">{isLive ? "Starting Camera..." : "Class is Offline"}</p>
+                            <p className="text-dark-500">Starting Camera...</p>
                         </div>
                     )}
                 </div>

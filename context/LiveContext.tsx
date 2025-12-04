@@ -8,6 +8,7 @@ interface LiveSessionState {
   viewerCount: number;
   localStream: MediaStream | null;
   remoteStream: MediaStream | null;
+  enablePreview: () => Promise<void>; // New: Preview before live
   startSession: (topic: string) => Promise<void>;
   endSession: () => void;
   joinSession: () => void;
@@ -16,6 +17,7 @@ interface LiveSessionState {
   toggleMic: (enabled: boolean) => void;
   toggleCamera: (enabled: boolean) => void;
   chatMessages: { user: string; text: string; timestamp: string }[];
+  checkStatus: () => void; // New: Manual check
 }
 
 const LiveContext = createContext<LiveSessionState | undefined>(undefined);
@@ -64,6 +66,7 @@ export const LiveProvider: React.FC<LiveProviderProps> = ({ children, user }) =>
       // to avoid resetting state based on echoed messages.
       if (isTeacher && isLive) return;
 
+      console.log("Received Session Status:", payload);
       setIsLive(payload.isLive);
       setTopic(payload.topic);
       
@@ -86,7 +89,7 @@ export const LiveProvider: React.FC<LiveProviderProps> = ({ children, user }) =>
 
     // Ask for status on mount (in case we refreshed student tab)
     if (!isTeacher) {
-      signaling.send('get_status', {});
+      checkStatus();
     }
 
     return () => {
@@ -94,15 +97,46 @@ export const LiveProvider: React.FC<LiveProviderProps> = ({ children, user }) =>
     };
   }, [isLive, topic, isTeacher]);
 
+  const checkStatus = () => {
+    console.log("Checking status...");
+    signaling.send('get_status', {});
+  };
+
   // --- TEACHER / BROADCASTER LOGIC ---
 
-  const startSession = async (newTopic: string) => {
+  const enablePreview = async () => {
     if (!isTeacher) return;
+    if (localStream) return; // Already on
+    
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        setLocalStream(stream);
+    } catch (err) {
+        console.error("Preview Error:", err);
+        alert("Camera permission denied. Please enable camera access in your browser settings to teach.");
+    }
+  };
+
+  const startSession = async (newTopic: string) => {
+    if (!isTeacher) {
+        alert("Only teachers can start a session.");
+        return;
+    }
 
     try {
-      // 1. Get User Media
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      setLocalStream(stream);
+      // 1. Get User Media if not already active
+      let stream = localStream;
+      if (!stream) {
+          try {
+            stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            setLocalStream(stream);
+          } catch(err) {
+             alert("Could not access camera/microphone. Please check permissions.");
+             return;
+          }
+      }
+
+      if (!stream) return; // Should not happen
 
       // 2. Update Local State
       setTopic(newTopic);
@@ -119,7 +153,6 @@ export const LiveProvider: React.FC<LiveProviderProps> = ({ children, user }) =>
 
     } catch (err) {
       console.error("Error starting stream:", err);
-      alert("Could not access camera/microphone. Please check permissions.");
     }
   };
 
@@ -312,10 +345,12 @@ export const LiveProvider: React.FC<LiveProviderProps> = ({ children, user }) =>
     <LiveContext.Provider value={{ 
       isLive, topic, viewerCount, 
       localStream, remoteStream,
+      enablePreview, // Exposed new function
       startSession, endSession, 
       joinSession, leaveSession,
       toggleMic, toggleCamera,
-      sendMessage, chatMessages 
+      sendMessage, chatMessages,
+      checkStatus
     }}>
       {children}
     </LiveContext.Provider>

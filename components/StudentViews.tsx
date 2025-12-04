@@ -4,7 +4,7 @@ import {
   CreditCard, Download, User as UserIcon, MapPin, 
   Phone, Mail, Shield, BookOpen, ChevronRight, Lock,
   Video, BarChart2, ListTodo, FileText, Activity, Briefcase,
-  Languages, GraduationCap, Globe, Zap, MessageCircle, Send, Users, Mic, MicOff, Hand
+  Languages, GraduationCap, Globe, Zap, MessageCircle, Send, Users, Mic, MicOff, Hand, RefreshCw
 } from 'lucide-react';
 import { User, Course, FeeRecord, Transaction, TestResult, ActivityItem } from '../types';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, Legend } from 'recharts';
@@ -279,7 +279,7 @@ export const StudentCoursesPage = () => {
 };
 
 export const StudentLiveRoom = ({ user }: { user: User }) => {
-    const { isLive, topic, viewerCount, sendMessage, chatMessages, remoteStream, joinSession } = useLiveSession();
+    const { isLive, topic, viewerCount, sendMessage, chatMessages, remoteStream, joinSession, checkStatus } = useLiveSession();
     const [message, setMessage] = useState("");
     const navigate = useNavigate();
     const remoteVideoRef = useRef<HTMLVideoElement>(null);
@@ -329,9 +329,14 @@ export const StudentLiveRoom = ({ user }: { user: User }) => {
                          <span className="w-2 h-2 bg-white rounded-full animate-bounce delay-300"></span>
                     </div>
                     
-                    <button onClick={() => navigate('/student/courses')} className="mt-8 text-gray-500 hover:text-white text-sm underline">
-                        Leave Waiting Room
-                    </button>
+                    <div className="flex flex-col gap-4 mt-8">
+                        <button onClick={checkStatus} className="bg-brand-600/80 hover:bg-brand-600 text-white px-6 py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 shadow-lg transition">
+                            <RefreshCw className="w-4 h-4" /> Refresh Status
+                        </button>
+                        <button onClick={() => navigate('/student/courses')} className="text-gray-500 hover:text-white text-sm underline">
+                            Leave Waiting Room
+                        </button>
+                    </div>
                 </div>
             </div>
         );
@@ -448,73 +453,74 @@ export const StudentLiveRoom = ({ user }: { user: User }) => {
 };
 
 export const StudentFeesPage = () => {
-  const totalDue = MOCK_FEES.reduce((acc, fee) => acc + fee.amount, 0);
-  const totalPaid = MOCK_FEES.filter(f => f.status === 'PAID').reduce((acc, fee) => acc + fee.amount, 0);
-  const pendingAmount = totalDue - totalPaid;
+  const phase1Fees = MOCK_FEES.filter(f => f.phase === 1);
+  const phase2Fees = MOCK_FEES.filter(f => f.phase === 2);
+
+  const calculateTotal = (fees: FeeRecord[]) => fees.reduce((acc, curr) => acc + curr.amount, 0);
 
   return (
     <div className="space-y-8 animate-fade-in">
       <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-        <CreditCard className="w-8 h-8 text-accent-gold" /> Tuition & Fees
+        <CreditCard className="w-8 h-8 text-brand-500" /> Tuition & Fees
       </h1>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-dark-800 p-6 rounded-xl border border-dark-700">
-           <p className="text-gray-400 text-sm font-semibold uppercase">Total Tuition (Phase 1+2)</p>
-           <h3 className="text-3xl font-bold text-white mt-2">¥{totalDue.toLocaleString()}</h3>
+      
+      {/* Phase 1 */}
+      <div className="bg-dark-800 rounded-xl border border-dark-700 overflow-hidden">
+        <div className="p-6 border-b border-dark-700 flex justify-between items-center bg-gradient-to-r from-dark-900 to-dark-800">
+            <div>
+                <h2 className="text-xl font-bold text-white">Phase 1: Domestic Training</h2>
+                <p className="text-sm text-gray-400">Total: ¥{calculateTotal(phase1Fees).toLocaleString()}</p>
+            </div>
+             <div className="px-3 py-1 bg-green-500/10 text-green-500 rounded text-xs font-bold border border-green-500/20">Active</div>
         </div>
-        <div className="bg-dark-800 p-6 rounded-xl border border-dark-700">
-           <p className="text-gray-400 text-sm font-semibold uppercase">Paid Amount</p>
-           <h3 className="text-3xl font-bold text-brand-500 mt-2">¥{totalPaid.toLocaleString()}</h3>
-        </div>
-        <div className="bg-dark-800 p-6 rounded-xl border border-dark-700">
-           <p className="text-gray-400 text-sm font-semibold uppercase">Pending Due</p>
-           <h3 className="text-3xl font-bold text-red-500 mt-2">¥{pendingAmount.toLocaleString()}</h3>
+        <div className="divide-y divide-dark-700">
+            {phase1Fees.map(fee => (
+                <div key={fee.id} className="p-4 flex items-center justify-between hover:bg-dark-700/30 transition">
+                    <div className="flex items-center gap-4">
+                        <div className={`p-3 rounded-full ${fee.status === 'PAID' ? 'bg-green-500/20 text-green-500' : fee.status === 'OVERDUE' ? 'bg-red-500/20 text-red-500' : 'bg-gray-500/20 text-gray-400'}`}>
+                            {fee.status === 'PAID' ? <CheckCircle className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
+                        </div>
+                        <div>
+                            <p className="text-white font-medium">{fee.title}</p>
+                            <p className="text-xs text-gray-500">Due: {fee.dueDate}</p>
+                        </div>
+                    </div>
+                    <div className="text-right">
+                        <p className="text-white font-mono font-bold">¥{fee.amount.toLocaleString()}</p>
+                        <StatusBadge status={fee.status} />
+                    </div>
+                </div>
+            ))}
         </div>
       </div>
 
-      <div className="bg-dark-800 rounded-xl border border-dark-700 overflow-hidden">
-        <div className="p-6 border-b border-dark-700">
-          <h3 className="font-bold text-white">Fee Breakdown</h3>
+       {/* Phase 2 */}
+       <div className="bg-dark-800 rounded-xl border border-dark-700 overflow-hidden opacity-75">
+        <div className="p-6 border-b border-dark-700 flex justify-between items-center bg-gradient-to-r from-dark-900 to-dark-800">
+            <div>
+                <h2 className="text-xl font-bold text-white">Phase 2: Placement Success</h2>
+                <p className="text-sm text-gray-400">Total: ¥{calculateTotal(phase2Fees).toLocaleString()}</p>
+            </div>
+             <div className="px-3 py-1 bg-gray-700 text-gray-400 rounded text-xs font-bold border border-gray-600">Locked</div>
         </div>
-        <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm text-gray-400">
-                <thead className="bg-dark-900 text-gray-200 uppercase font-bold text-xs">
-                    <tr>
-                        <th className="px-6 py-4">Title</th>
-                        <th className="px-6 py-4">Category</th>
-                        <th className="px-6 py-4">Due Date</th>
-                        <th className="px-6 py-4">Amount</th>
-                        <th className="px-6 py-4">Status</th>
-                        <th className="px-6 py-4 text-right">Action</th>
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-dark-700">
-                    {MOCK_FEES.map((fee) => (
-                        <tr key={fee.id} className="hover:bg-dark-700/50 transition">
-                            <td className="px-6 py-4 font-medium text-white">{fee.title}</td>
-                            <td className="px-6 py-4">
-                                <span className="bg-dark-900 px-2 py-1 rounded border border-dark-600 text-xs">Phase {fee.phase}</span>
-                            </td>
-                            <td className="px-6 py-4">{fee.dueDate}</td>
-                            <td className="px-6 py-4 font-mono text-white">¥{fee.amount.toLocaleString()}</td>
-                            <td className="px-6 py-4"><StatusBadge status={fee.status} /></td>
-                            <td className="px-6 py-4 text-right">
-                                {fee.status !== 'PAID' && (
-                                    <button className="bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold px-3 py-1 rounded transition">
-                                        Pay Now
-                                    </button>
-                                )}
-                                {fee.status === 'PAID' && (
-                                    <button className="text-gray-500 hover:text-white text-xs flex items-center gap-1 ml-auto">
-                                        <Download className="w-3 h-3" /> Receipt
-                                    </button>
-                                )}
-                            </td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
+        <div className="divide-y divide-dark-700">
+            {phase2Fees.map(fee => (
+                <div key={fee.id} className="p-4 flex items-center justify-between hover:bg-dark-700/30 transition">
+                    <div className="flex items-center gap-4">
+                        <div className="p-3 rounded-full bg-gray-500/20 text-gray-400">
+                            <Lock className="w-5 h-5" />
+                        </div>
+                        <div>
+                            <p className="text-white font-medium">{fee.title}</p>
+                            <p className="text-xs text-gray-500">Due: {fee.dueDate}</p>
+                        </div>
+                    </div>
+                    <div className="text-right">
+                        <p className="text-white font-mono font-bold">¥{fee.amount.toLocaleString()}</p>
+                        <StatusBadge status={fee.status} />
+                    </div>
+                </div>
+            ))}
         </div>
       </div>
     </div>
@@ -525,90 +531,35 @@ export const StudentTestsPage = () => {
     return (
         <div className="space-y-8 animate-fade-in">
              <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-                <FileText className="w-8 h-8 text-brand-500" /> JLPT Mock Results
-             </h1>
-
-             <div className="bg-dark-800 rounded-xl border border-dark-700 p-6">
-                 <h3 className="text-xl font-bold text-white mb-6">Performance Trend</h3>
-                 <div className="h-64 w-full">
-                     <ResponsiveContainer width="100%" height="100%">
-                         <BarChart data={MOCK_TESTS}>
-                             <XAxis dataKey="title" stroke="#94a3b8" hide />
-                             <YAxis stroke="#94a3b8" />
-                             <Tooltip 
-                                contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', color: '#fff' }}
-                                cursor={{fill: 'rgba(255,255,255,0.05)'}}
-                             />
-                             <Legend />
-                             <Bar dataKey="score" name="My Score" fill="#bc002d" radius={[4, 4, 0, 0]} barSize={40} />
-                             <Bar dataKey="classAverage" name="Class Avg" fill="#334155" radius={[4, 4, 0, 0]} barSize={40} />
-                         </BarChart>
-                     </ResponsiveContainer>
-                 </div>
-             </div>
-
-             <div className="grid grid-cols-1 gap-4">
-                 {MOCK_TESTS.map(test => (
-                     <div key={test.id} className="bg-dark-800 p-6 rounded-xl border border-dark-700 flex flex-col md:flex-row items-center justify-between gap-4">
-                         <div className="flex items-center gap-4">
-                             <div className="p-4 bg-dark-900 rounded-lg text-center min-w-[80px]">
-                                 <h4 className="text-2xl font-bold text-white">{Math.round((test.score / test.totalScore) * 100)}%</h4>
-                                 <p className="text-xs text-gray-500">Score</p>
-                             </div>
-                             <div>
-                                 <h4 className="text-lg font-bold text-white">{test.title}</h4>
-                                 <p className="text-sm text-gray-400">{test.subject} • {test.date}</p>
-                             </div>
-                         </div>
-                         <div className="flex gap-8 text-sm text-gray-400">
-                             <div>
-                                 <p className="uppercase text-xs font-bold mb-1">Class Avg</p>
-                                 <p className="text-white">{test.classAverage}/{test.totalScore}</p>
-                             </div>
-                             <div>
-                                 <p className="uppercase text-xs font-bold mb-1">Topper</p>
-                                 <p className="text-brand-500">{test.topperScore}/{test.totalScore}</p>
-                             </div>
-                             <button className="bg-dark-700 hover:bg-dark-600 text-white px-4 py-2 rounded-lg self-center">
-                                 Analysis
-                             </button>
-                         </div>
-                     </div>
-                 ))}
-             </div>
-        </div>
-    );
-};
-
-export const StudentActivityPage = () => {
-    return (
-        <div className="space-y-8 animate-fade-in">
-            <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-                <ListTodo className="w-8 h-8 text-blue-500" /> Activities & Assignments
+                <FileText className="w-8 h-8 text-brand-500" /> JLPT & Mock Results
             </h1>
 
-            <div className="grid grid-cols-1 gap-4">
-                {MOCK_ACTIVITIES.map(activity => (
-                    <div key={activity.id} className={`bg-dark-800 p-6 rounded-xl border ${activity.status === 'PENDING' ? 'border-brand-500/50' : 'border-dark-700'} flex justify-between items-center`}>
-                        <div className="flex items-center gap-4">
-                             <div className={`p-3 rounded-full ${activity.type === 'ASSIGNMENT' ? 'bg-blue-500/20 text-blue-500' : activity.type === 'QUIZ' ? 'bg-purple-500/20 text-purple-500' : 'bg-green-500/20 text-green-500'}`}>
-                                 {activity.type === 'ASSIGNMENT' ? <FileText className="w-6 h-6" /> : activity.type === 'QUIZ' ? <AlertCircle className="w-6 h-6" /> : <Briefcase className="w-6 h-6" />}
-                             </div>
-                             <div>
-                                 <h4 className="text-lg font-bold text-white">{activity.title}</h4>
-                                 <p className="text-sm text-gray-400">{activity.courseName} • Due: {activity.dueDate}</p>
-                             </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {MOCK_TESTS.map(test => (
+                    <div key={test.id} className="bg-dark-800 rounded-xl border border-dark-700 p-6 flex flex-col relative overflow-hidden group hover:border-brand-500/50 transition">
+                        <div className="flex justify-between items-start mb-4">
+                            <div className="p-3 bg-brand-900/20 text-brand-500 rounded-lg">
+                                <Activity className="w-6 h-6" />
+                            </div>
+                            <span className="text-xs font-mono text-gray-500">{test.date}</span>
                         </div>
-                        <div>
-                             {activity.status === 'PENDING' ? (
-                                 <button className="bg-brand-600 hover:bg-brand-500 text-white px-6 py-2 rounded-lg font-bold shadow-lg shadow-brand-900/30">
-                                     Start Now
-                                 </button>
-                             ) : (
-                                 <div className="flex items-center gap-2 text-green-500 font-bold px-4">
-                                     <CheckCircle className="w-5 h-5" /> Completed
-                                 </div>
-                             )}
+                        <h3 className="text-lg font-bold text-white mb-1">{test.title}</h3>
+                        <p className="text-sm text-gray-400 mb-6">{test.subject}</p>
+                        
+                        <div className="mt-auto">
+                            <div className="flex justify-between items-end mb-2">
+                                <div>
+                                    <span className="text-3xl font-bold text-white">{test.score}</span>
+                                    <span className="text-sm text-gray-500">/{test.totalScore}</span>
+                                </div>
+                                <div className="text-right">
+                                     <p className="text-xs text-gray-400">Class Avg</p>
+                                     <p className="text-sm font-bold text-gray-300">{test.classAverage}</p>
+                                </div>
+                            </div>
+                            <div className="w-full bg-dark-900 rounded-full h-2 overflow-hidden">
+                                <div style={{width: `${(test.score / test.totalScore) * 100}%`}} className={`h-full rounded-full ${test.score >= test.classAverage ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                            </div>
                         </div>
                     </div>
                 ))}
@@ -617,83 +568,126 @@ export const StudentActivityPage = () => {
     );
 };
 
-export const StudentProfilePage = ({ user }: { user: User }) => {
-    return (
-        <div className="max-w-4xl mx-auto space-y-8 animate-fade-in">
-            <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-                <UserIcon className="w-8 h-8 text-gray-400" /> My Profile
+export const StudentActivityPage = () => {
+     return (
+        <div className="space-y-8 animate-fade-in">
+             <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+                <ListTodo className="w-8 h-8 text-brand-500" /> Practice & Assignments
             </h1>
 
             <div className="bg-dark-800 rounded-xl border border-dark-700 overflow-hidden">
-                <div className="h-32 bg-gradient-to-r from-brand-900 to-dark-900"></div>
-                <div className="px-8 pb-8">
-                    <div className="relative -mt-16 mb-6 flex justify-between items-end">
-                        <img src={user.avatar} alt={user.name} className="w-32 h-32 rounded-full border-4 border-dark-800 bg-dark-900" />
-                        <button className="bg-dark-700 hover:bg-dark-600 text-white px-4 py-2 rounded-lg text-sm font-bold border border-dark-600">
-                            Edit Profile
-                        </button>
-                    </div>
-                    
-                    <h2 className="text-3xl font-bold text-white">{user.name}</h2>
-                    <p className="text-gray-400">{user.email}</p>
-                    <div className="flex gap-3 mt-4">
-                        <span className="bg-brand-500/20 text-brand-500 px-3 py-1 rounded text-xs font-bold uppercase border border-brand-500/30">
-                            {user.role}
-                        </span>
-                        <span className="bg-blue-500/20 text-blue-500 px-3 py-1 rounded text-xs font-bold uppercase border border-blue-500/30">
-                            Batch 2024-A
-                        </span>
-                    </div>
+                <div className="divide-y divide-dark-700">
+                    {MOCK_ACTIVITIES.map(act => (
+                        <div key={act.id} className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-dark-700/30 transition">
+                            <div className="flex items-start gap-4">
+                                <div className={`p-3 rounded-lg ${act.type === 'ASSIGNMENT' ? 'bg-blue-500/20 text-blue-500' : act.type === 'QUIZ' ? 'bg-purple-500/20 text-purple-500' : 'bg-orange-500/20 text-orange-500'}`}>
+                                    {act.type === 'ASSIGNMENT' ? <FileText className="w-6 h-6" /> : act.type === 'QUIZ' ? <AlertCircle className="w-6 h-6" /> : <Briefcase className="w-6 h-6" />}
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-bold text-white">{act.title}</h3>
+                                    <div className="flex gap-3 text-sm text-gray-400 mt-1">
+                                        <span className="flex items-center gap-1"><BookOpen className="w-3 h-3" /> {act.courseName}</span>
+                                        <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> Due: {act.dueDate}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                <span className={`px-3 py-1 rounded text-xs font-bold border ${act.status === 'COMPLETED' ? 'bg-green-500/10 text-green-500 border-green-500/20' : 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20'}`}>
+                                    {act.status}
+                                </span>
+                                <button className="bg-dark-700 hover:bg-dark-600 text-white px-4 py-2 rounded-lg text-sm font-bold transition">
+                                    {act.status === 'COMPLETED' ? 'Review' : 'Start'}
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </div>
+     );
+};
+
+
+export const StudentProfilePage = ({ user }: { user: User }) => {
+    return (
+        <div className="space-y-8 animate-fade-in">
+            <div className="relative h-48 bg-gradient-to-r from-brand-900 to-dark-800 rounded-xl overflow-hidden border border-brand-500/30">
+                 <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/seigaiha.png')] opacity-30"></div>
+            </div>
+            
+            <div className="relative px-8 -mt-16 flex flex-col md:flex-row items-end gap-6">
+                <div className="w-32 h-32 rounded-full border-4 border-dark-900 overflow-hidden shadow-2xl bg-dark-800">
+                    <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
+                </div>
+                <div className="flex-1 mb-2">
+                    <h1 className="text-3xl font-bold text-white">{user.name}</h1>
+                    <p className="text-gray-400 flex items-center gap-2">
+                        <span className="bg-brand-500/20 text-brand-500 px-2 py-0.5 rounded text-xs font-bold border border-brand-500/30 uppercase">{user.role}</span>
+                        <span>•</span>
+                        <span>Batch 2024-A</span>
+                    </p>
+                </div>
+                <div className="mb-4 flex gap-3">
+                    <button className="bg-dark-700 hover:bg-dark-600 text-white px-4 py-2 rounded-lg font-bold text-sm border border-dark-600">Edit Profile</button>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="bg-dark-800 p-6 rounded-xl border border-dark-700 space-y-4">
-                    <h3 className="text-lg font-bold text-white border-b border-dark-700 pb-2">Personal Information</h3>
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div>
-                            <p className="text-gray-500">Full Name</p>
-                            <p className="text-white font-medium">{user.name}</p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div className="md:col-span-2 space-y-8">
+                     <div className="bg-dark-800 rounded-xl border border-dark-700 p-6">
+                        <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                            <UserIcon className="w-5 h-5 text-gray-400" /> Personal Information
+                        </h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label className="text-xs text-gray-500 uppercase font-bold">Email Address</label>
+                                <p className="text-white font-medium mt-1">{user.email}</p>
+                            </div>
+                             <div>
+                                <label className="text-xs text-gray-500 uppercase font-bold">Phone Number</label>
+                                <p className="text-white font-medium mt-1">{user.phone || '+91 98765 43210'}</p>
+                            </div>
+                             <div>
+                                <label className="text-xs text-gray-500 uppercase font-bold">Student ID</label>
+                                <p className="text-white font-mono font-medium mt-1">{user.id.toUpperCase()}</p>
+                            </div>
+                             <div>
+                                <label className="text-xs text-gray-500 uppercase font-bold">Enrolled Date</label>
+                                <p className="text-white font-medium mt-1">Aug 01, 2023</p>
+                            </div>
                         </div>
-                        <div>
-                            <p className="text-gray-500">Date of Birth</p>
-                            <p className="text-white font-medium">1999-05-15</p>
+                     </div>
+
+                     <div className="bg-dark-800 rounded-xl border border-dark-700 p-6">
+                        <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                            <Briefcase className="w-5 h-5 text-gray-400" /> Placement Status
+                        </h3>
+                        <div className="bg-dark-900 rounded-lg p-4 border border-dark-700 flex items-center gap-4">
+                             <div className="p-3 bg-blue-500/20 text-blue-500 rounded-full">
+                                 <Globe className="w-6 h-6" />
+                             </div>
+                             <div>
+                                 <h4 className="text-white font-bold">Target: Japan Engineering Visa</h4>
+                                 <p className="text-sm text-gray-400">Documentation Phase (Waiting for N4 Result)</p>
+                             </div>
                         </div>
-                        <div>
-                            <p className="text-gray-500">Phone</p>
-                            <p className="text-white font-medium">+91 98765 43210</p>
-                        </div>
-                        <div>
-                            <p className="text-gray-500">Gender</p>
-                            <p className="text-white font-medium">Male</p>
-                        </div>
-                        <div className="col-span-2">
-                             <p className="text-gray-500">Address</p>
-                             <p className="text-white font-medium">123, Tech Park Road, Bangalore, India</p>
-                        </div>
-                    </div>
+                     </div>
                 </div>
 
-                <div className="bg-dark-800 p-6 rounded-xl border border-dark-700 space-y-4">
-                    <h3 className="text-lg font-bold text-white border-b border-dark-700 pb-2">Academic & Guardian</h3>
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div>
-                             <p className="text-gray-500">Guardian Name</p>
-                             <p className="text-white font-medium">Mr. Parent</p>
+                <div className="space-y-6">
+                     <div className="bg-dark-800 rounded-xl border border-dark-700 p-6">
+                        <h3 className="text-sm font-bold text-gray-400 uppercase mb-4">Certificates</h3>
+                        <div className="space-y-3">
+                             <div className="flex items-center gap-3 p-3 bg-dark-900 rounded border border-dark-600 hover:border-brand-500 transition cursor-pointer group">
+                                 <GraduationCap className="w-5 h-5 text-gray-500 group-hover:text-brand-500" />
+                                 <span className="text-sm text-gray-300">JLPT N5 Certificate</span>
+                             </div>
+                             <div className="flex items-center gap-3 p-3 bg-dark-900 rounded border border-dark-600 hover:border-brand-500 transition cursor-pointer group">
+                                 <GraduationCap className="w-5 h-5 text-gray-500 group-hover:text-brand-500" />
+                                 <span className="text-sm text-gray-300">Course Completion</span>
+                             </div>
                         </div>
-                        <div>
-                             <p className="text-gray-500">Relationship</p>
-                             <p className="text-white font-medium">Father</p>
-                        </div>
-                        <div>
-                             <p className="text-gray-500">Emergency Contact</p>
-                             <p className="text-white font-medium">+91 98765 00000</p>
-                        </div>
-                         <div>
-                             <p className="text-gray-500">Previous Education</p>
-                             <p className="text-white font-medium">B.Tech (CS)</p>
-                        </div>
-                    </div>
+                     </div>
                 </div>
             </div>
         </div>
