@@ -8,6 +8,7 @@ interface LiveSessionState {
   viewerCount: number;
   localStream: MediaStream | null;
   remoteStream: MediaStream | null;
+  connectionState: 'idle' | 'connecting' | 'connected' | 'failed';
   enablePreview: () => Promise<void>;
   startSession: (topic: string) => Promise<void>;
   endSession: () => void;
@@ -42,15 +43,24 @@ export const LiveProvider: React.FC<LiveProviderProps> = ({ children, user }) =>
   
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const [connectionState, setConnectionState] = useState<'idle' | 'connecting' | 'connected' | 'failed'>('idle');
 
-  // Teacher Refs
+  // Refs for State Access inside Event Listeners (Prevents Effect re-runs)
+  const localStreamRef = useRef<MediaStream | null>(null);
+  const isLiveRef = useRef(isLive);
+  const topicRef = useRef(topic);
+
+  // WebRTC Refs
   const peerConnections = useRef<Map<string, RTCPeerConnection>>(new Map());
-  
-  // Student Refs
   const studentPeerConnection = useRef<RTCPeerConnection | null>(null);
   const pendingCandidates = useRef<RTCIceCandidateInit[]>([]);
 
   const isTeacher = user?.role === UserRole.TEACHER;
+
+  // Sync Refs with State
+  useEffect(() => { localStreamRef.current = localStream; }, [localStream]);
+  useEffect(() => { isLiveRef.current = isLive; }, [isLive]);
+  useEffect(() => { topicRef.current = topic; }, [topic]);
 
   // --- GLOBAL SIGNALING LISTENERS ---
   useEffect(() => {
@@ -61,7 +71,7 @@ export const LiveProvider: React.FC<LiveProviderProps> = ({ children, user }) =>
 
     // 2. Session Status (For Students)
     const handleSessionStatus = (payload: any) => {
-      if (isTeacher && isLive) return; // Ignore own broadcast if active
+      if (isTeacher && isLiveRef.current) return; // Ignore own broadcast if active
 
       console.log("Received Session Status:", payload);
       setIsLive(payload.isLive);
@@ -69,14 +79,18 @@ export const LiveProvider: React.FC<LiveProviderProps> = ({ children, user }) =>
       
       if (!payload.isLive) {
         // Class Ended
-        leaveSession(); // Cleanup student side
+        leaveSession(); 
+      } else {
+        // Class Started/Active - Trigger join if not connected
+        // We handle this via the auto-join effect in the component or here.
+        // Doing it in component is safer for UI sync.
       }
     };
 
     // 3. Status Request (For Teacher)
     const handleGetStatus = (payload: any, from: string) => {
-      if (isTeacher && isLive) {
-        signaling.send('session_status', { isLive: true, topic }, from);
+      if (isTeacher && isLiveRef.current) {
+        signaling.send('session_status', { isLive: true, topic: topicRef.current }, from);
       }
     };
 
@@ -84,9 +98,11 @@ export const LiveProvider: React.FC<LiveProviderProps> = ({ children, user }) =>
     const handleAnswer = async (answer: RTCSessionDescriptionInit, from: string) => {
         if (!isTeacher) return;
         const pc = peerConnections.current.get(from);
-        if (pc && pc.signalingState !== 'stable') {
+        if (pc) {
             try {
-                await pc.setRemoteDescription(new RTCSessionDescription(answer));
+                if(pc.signalingState !== 'stable') {
+                    await pc.setRemoteDescription(new RTCSessionDescription(answer));
+                }
             } catch (e) { console.error("Error setting remote description (Teacher):", e); }
         }
     };
@@ -94,15 +110,12 @@ export const LiveProvider: React.FC<LiveProviderProps> = ({ children, user }) =>
     // 5. WebRTC: Ice Candidate (For Teacher & Student)
     const handleCandidate = async (candidate: RTCIceCandidateInit, from: string) => {
         if (isTeacher) {
-            // Teacher handling student candidate
             const pc = peerConnections.current.get(from);
             if (pc) {
-                try {
-                    await pc.addIceCandidate(new RTCIceCandidate(candidate));
-                } catch (e) { console.error("Error adding candidate (Teacher):", e); }
+                try { await pc.addIceCandidate(new RTCIceCandidate(candidate)); } 
+                catch (e) { console.error("Error adding candidate (Teacher):", e); }
             }
         } else {
-            // Student handling teacher candidate
             const pc = studentPeerConnection.current;
             if (pc) {
                 try {
@@ -118,20 +131,15 @@ export const LiveProvider: React.FC<LiveProviderProps> = ({ children, user }) =>
 
     // 6. WebRTC: Offer (For Student)
     const handleOffer = async (offer: RTCSessionDescriptionInit, teacherId: string) => {
-        if (isTeacher) return; // Teachers don't accept offers in this model
+        if (isTeacher) return;
         
         const pc = studentPeerConnection.current;
-        if (!pc) return;
+        if (!pc) return; // Should be initialized by joinSession
         
         console.log("Student: Received Offer");
         try {
-            if (pc.signalingState !== 'stable') {
-               // If we are already connecting, we might need to reset or handle renegotiation. 
-               // For simplicity, we proceed.
-            }
             await pc.setRemoteDescription(new RTCSessionDescription(offer));
             
-            // Process buffered candidates
             while (pendingCandidates.current.length > 0) {
                 const c = pendingCandidates.current.shift();
                 if (c) await pc.addIceCandidate(new RTCIceCandidate(c));
@@ -140,17 +148,22 @@ export const LiveProvider: React.FC<LiveProviderProps> = ({ children, user }) =>
             const answer = await pc.createAnswer();
             await pc.setLocalDescription(answer);
             signaling.send('answer', answer, teacherId);
+            setConnectionState('connected');
         } catch (e) {
             console.error("Student Offer Error", e);
+            setConnectionState('failed');
         }
     };
 
     // 7. WebRTC: Join Request (For Teacher)
     const handleJoin = async (payload: any, studentId: string) => {
-        if (!isTeacher || !localStream) return;
+        if (!isTeacher) return;
+        const stream = localStreamRef.current;
+        if (!stream) return;
+
         console.log("Teacher: Student joining:", studentId);
         setViewerCount(prev => prev + 1);
-        await createBroadcasterPeer(studentId, localStream);
+        await createBroadcasterPeer(studentId, stream);
     };
 
     // Register Listeners
@@ -162,7 +175,7 @@ export const LiveProvider: React.FC<LiveProviderProps> = ({ children, user }) =>
     signaling.on('offer', handleOffer);
     signaling.on('join', handleJoin);
 
-    // Initial Status Check for Students
+    // Initial Status Check
     if (!isTeacher) {
       checkStatus();
     }
@@ -176,27 +189,35 @@ export const LiveProvider: React.FC<LiveProviderProps> = ({ children, user }) =>
         signaling.off('offer', handleOffer);
         signaling.off('join', handleJoin);
     };
-  }, [isTeacher, isLive, localStream, topic]);
+  }, [isTeacher]); // Dependency only on role (stable)
 
   const checkStatus = () => {
     console.log("Checking status...");
     signaling.send('get_status', {});
   };
 
+  const addSystemMessage = (text: string) => {
+    const msg = {
+      user: 'SYSTEM',
+      text,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+    setChatMessages(prev => [...prev, msg]);
+    signaling.send('chat', msg);
+  };
+
   // --- TEACHER FUNCTIONS ---
 
   const enablePreview = async () => {
     if (!isTeacher) return;
-    if (localStream) return; 
+    if (localStream) return;
     
     try {
-        console.log("Requesting user media...");
         const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
         setLocalStream(stream);
-        console.log("Media stream acquired");
     } catch (err) {
         console.error("Preview Error:", err);
-        alert("Camera permission denied. Please allow access.");
+        alert("Camera permission denied.");
     }
   };
 
@@ -222,7 +243,6 @@ export const LiveProvider: React.FC<LiveProviderProps> = ({ children, user }) =>
   };
 
   const createBroadcasterPeer = async (studentId: string, stream: MediaStream) => {
-    // Cleanup old connection for this student
     if (peerConnections.current.has(studentId)) {
         peerConnections.current.get(studentId)?.close();
     }
@@ -238,7 +258,6 @@ export const LiveProvider: React.FC<LiveProviderProps> = ({ children, user }) =>
       }
     };
     
-    // Cleanup listener when PC closes
     pc.onconnectionstatechange = () => {
         if(pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
             peerConnections.current.delete(studentId);
@@ -285,12 +304,13 @@ export const LiveProvider: React.FC<LiveProviderProps> = ({ children, user }) =>
 
   const joinSession = async () => {
     if (studentPeerConnection.current) {
-        console.log("Already joined, closing existing to rejoin...");
+        // If already connecting or connected, don't restart unless failed
+        if (studentPeerConnection.current.connectionState === 'connected') return;
         studentPeerConnection.current.close();
-        studentPeerConnection.current = null;
     }
 
     console.log("Student: Joining session...");
+    setConnectionState('connecting');
     
     const pc = new RTCPeerConnection(RTC_CONFIG);
     studentPeerConnection.current = pc;
@@ -305,6 +325,16 @@ export const LiveProvider: React.FC<LiveProviderProps> = ({ children, user }) =>
     pc.ontrack = (event) => {
       console.log("Student: Received Remote Stream");
       setRemoteStream(event.streams[0]);
+      setConnectionState('connected');
+    };
+    
+    pc.onconnectionstatechange = () => {
+        console.log("Student Connection State:", pc.connectionState);
+        if (pc.connectionState === 'connected') {
+            setConnectionState('connected');
+        } else if (pc.connectionState === 'failed') {
+            setConnectionState('failed');
+        }
     };
 
     signaling.send('join', {});
@@ -316,9 +346,8 @@ export const LiveProvider: React.FC<LiveProviderProps> = ({ children, user }) =>
       studentPeerConnection.current = null;
     }
     setRemoteStream(null);
+    setConnectionState('idle');
   };
-
-  // --- CHAT ---
 
   const sendMessage = (user: string, text: string) => {
     const msg = {
@@ -330,14 +359,11 @@ export const LiveProvider: React.FC<LiveProviderProps> = ({ children, user }) =>
     signaling.send('chat', msg);
   };
 
-  const addSystemMessage = (text: string) => {
-    sendMessage("SYSTEM", text);
-  };
-
   return (
     <LiveContext.Provider value={{ 
       isLive, topic, viewerCount, 
       localStream, remoteStream,
+      connectionState,
       enablePreview,
       startSession, endSession, 
       joinSession, leaveSession,

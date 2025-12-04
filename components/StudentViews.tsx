@@ -4,7 +4,7 @@ import {
   CreditCard, Download, User as UserIcon, MapPin, 
   Phone, Mail, Shield, BookOpen, ChevronRight, Lock,
   Video, BarChart2, ListTodo, FileText, Activity, Briefcase,
-  Languages, GraduationCap, Globe, Zap, MessageCircle, Send, Users, Mic, MicOff, Hand, RefreshCw
+  Languages, GraduationCap, Globe, Zap, MessageCircle, Send, Users, Mic, MicOff, Hand, RefreshCw, Loader2
 } from 'lucide-react';
 import { User, Course, FeeRecord, Transaction, TestResult, ActivityItem } from '../types';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, Legend } from 'recharts';
@@ -279,24 +279,30 @@ export const StudentCoursesPage = () => {
 };
 
 export const StudentLiveRoom = ({ user }: { user: User }) => {
-    const { isLive, topic, viewerCount, sendMessage, chatMessages, remoteStream, joinSession, leaveSession, checkStatus } = useLiveSession();
+    const { isLive, topic, viewerCount, sendMessage, chatMessages, remoteStream, joinSession, leaveSession, checkStatus, connectionState } = useLiveSession();
     const [message, setMessage] = useState("");
     const navigate = useNavigate();
     const remoteVideoRef = useRef<HTMLVideoElement>(null);
     const [isChatOpen, setIsChatOpen] = useState(true);
 
-    // Auto-join on mount, cleanup on unmount
+    // Auto-join on mount or when going live
     useEffect(() => {
-        // Only join if live and we don't have a stream yet
         if (isLive && !remoteStream) {
             joinSession();
         }
+        
+        // Retry logic: If connecting for more than 5s, retry
+        const interval = setInterval(() => {
+            if(isLive && connectionState === 'idle' && !remoteStream) {
+                joinSession();
+            }
+        }, 5000);
 
-        // Cleanup on unmount (navigation away)
         return () => {
-           leaveSession();
+            clearInterval(interval);
+            leaveSession();
         };
-    }, [isLive]); // Dependency on isLive allows auto-rejoin if status flips back
+    }, [isLive]); // Depend on isLive to re-trigger if status changes
 
     // Attach stream to video element
     useEffect(() => {
@@ -363,14 +369,20 @@ export const StudentLiveRoom = ({ user }: { user: User }) => {
                       ) : (
                           <div className="absolute inset-0 flex items-center justify-center text-gray-500 bg-black z-10">
                              <div className="text-center">
-                                 <div className="w-10 h-10 border-2 border-brand-500 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-                                 <p>Connecting to Stream...</p>
+                                 <Loader2 className="w-12 h-12 text-brand-500 animate-spin mx-auto mb-4" />
+                                 <p className="text-white font-bold text-lg mb-2">Connecting to Classroom...</p>
+                                 <p className="text-gray-400 text-sm"> establishing secure stream</p>
+                                 {connectionState === 'failed' && (
+                                     <button onClick={() => joinSession()} className="mt-4 bg-dark-800 px-4 py-2 rounded text-white text-sm border border-dark-600 hover:bg-dark-700">
+                                         Retry Connection
+                                     </button>
+                                 )}
                              </div>
                           </div>
                       )}
                       
                       {/* Controls Overlay */}
-                      <div className="absolute top-4 left-4 flex gap-2 z-20">
+                      <div className="absolute top-4 left-4 flex gap-2 z-20 pointer-events-none">
                            <div className="bg-red-600 text-white px-3 py-1 rounded text-xs font-bold flex items-center gap-2 shadow-lg">
                                 <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span> LIVE
                            </div>
@@ -380,7 +392,7 @@ export const StudentLiveRoom = ({ user }: { user: User }) => {
                       </div>
                       
                       <div className="absolute bottom-4 right-4 z-40">
-                          <button onClick={() => setIsChatOpen(!isChatOpen)} className="bg-dark-900/80 p-3 rounded-full text-white hover:bg-brand-600 transition">
+                          <button onClick={() => setIsChatOpen(!isChatOpen)} className="bg-dark-900/80 p-3 rounded-full text-white hover:bg-brand-600 transition shadow-lg border border-white/10">
                               <MessageCircle className="w-6 h-6" />
                           </button>
                       </div>
@@ -429,7 +441,7 @@ export const StudentLiveRoom = ({ user }: { user: User }) => {
              {/* Floating Leave Button (z-40) */}
              <button 
                 onClick={() => navigate('/student/courses')} 
-                className="fixed top-4 right-4 z-40 bg-red-600/80 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-bold text-sm backdrop-blur shadow-lg"
+                className="fixed top-4 right-4 z-40 bg-red-600/80 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-bold text-sm backdrop-blur shadow-lg border border-red-500/30"
              >
                  Exit Class
              </button>
