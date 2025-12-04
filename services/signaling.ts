@@ -2,7 +2,7 @@
 // This allows the app to function with Real WebRTC across multiple tabs without a Node.js backend.
 // In a real production app, replace 'BroadcastChannel' logic with 'socket.io-client'.
 
-type SignalType = 'login' | 'join' | 'offer' | 'answer' | 'candidate' | 'chat' | 'session_status';
+type SignalType = 'login' | 'join' | 'offer' | 'answer' | 'candidate' | 'chat' | 'session_status' | 'get_status';
 
 interface SignalMessage {
   type: SignalType;

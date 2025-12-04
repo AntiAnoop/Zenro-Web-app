@@ -13,8 +13,9 @@ interface LiveSessionState {
   joinSession: () => void;
   leaveSession: () => void;
   sendMessage: (user: string, text: string) => void;
+  toggleMic: (enabled: boolean) => void;
+  toggleCamera: (enabled: boolean) => void;
   chatMessages: { user: string; text: string; timestamp: string }[];
-  currentUserRole?: UserRole; // Need to know if we are broadcaster or viewer
 }
 
 const LiveContext = createContext<LiveSessionState | undefined>(undefined);
@@ -40,6 +41,7 @@ export const LiveProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // WebRTC Refs
   const peerConnections = useRef<Map<string, RTCPeerConnection>>(new Map()); // Teacher: map studentId -> PC
   const studentPeerConnection = useRef<RTCPeerConnection | null>(null); // Student: single PC to teacher
+  const pendingCandidates = useRef<RTCIceCandidateInit[]>([]); // Buffer for candidates arriving before remote desc
 
   // State to track if we are the broadcaster
   const isBroadcaster = useRef(false);
@@ -52,14 +54,15 @@ export const LiveProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setChatMessages(prev => [...prev, payload]);
     });
 
-    // 2. Handle Session Status Updates (Student view mainly)
+    // 2. Handle Session Status Updates
     signaling.on('session_status', (payload) => {
+      // If we are broadcaster, ignore our own broadcasts
+      if (isBroadcaster.current) return;
+
       setIsLive(payload.isLive);
       setTopic(payload.topic);
-      if(payload.isLive) {
-          // If we are a student and session went live, auto-trigger join intent logic if needed
-          // (Handled by manual join or auto-effect in component)
-      } else {
+      
+      if (!payload.isLive) {
         // Class ended
         if (studentPeerConnection.current) {
             studentPeerConnection.current.close();
@@ -69,10 +72,20 @@ export const LiveProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
     });
 
+    // 3. Handle Status Requests (New student joins and asks "Are we live?")
+    signaling.on('get_status', (payload, from) => {
+      if (isBroadcaster.current && isLive) {
+        signaling.send('session_status', { isLive: true, topic }, from);
+      }
+    });
+
+    // Ask for status on mount (in case we refreshed student tab)
+    signaling.send('get_status', {});
+
     return () => {
-      // Cleanup handled in individual start/join functions mostly, but good practice
+      // Clean up is complex in React.StrictMode, relying on explicit endSession/leaveSession
     };
-  }, []);
+  }, [isLive, topic]);
 
   // --- TEACHER / BROADCASTER LOGIC ---
 
@@ -92,24 +105,34 @@ export const LiveProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       // 3. Broadcast Status
       signaling.send('session_status', { isLive: true, topic: newTopic });
 
-      // 4. Listen for Join Requests from Students
-      signaling.on('join', async (payload, studentId) => {
-        console.log("Student joining:", studentId);
-        setViewerCount(prev => prev + 1);
-        await createBroadcasterPeer(studentId, stream);
-      });
+      // 4. Setup Listener for Join Requests
+      // We remove old listeners to prevent duplicates if startSession is called multiple times
+      signaling.off('join', handleJoinRequest); 
+      signaling.on('join', handleJoinRequest);
 
     } catch (err) {
       console.error("Error starting stream:", err);
-      alert("Could not access camera/microphone.");
+      alert("Could not access camera/microphone. Please check permissions.");
     }
   };
 
+  const handleJoinRequest = async (payload: any, studentId: string) => {
+    if (!localStream) return;
+    console.log("Teacher: Student joining:", studentId);
+    setViewerCount(prev => prev + 1);
+    await createBroadcasterPeer(studentId, localStream);
+  };
+
   const createBroadcasterPeer = async (studentId: string, stream: MediaStream) => {
+    // Close existing if any
+    if (peerConnections.current.has(studentId)) {
+        peerConnections.current.get(studentId)?.close();
+    }
+
     const pc = new RTCPeerConnection(RTC_CONFIG);
     peerConnections.current.set(studentId, pc);
 
-    // Add local tracks to the connection
+    // Add local tracks
     stream.getTracks().forEach(track => pc.addTrack(track, stream));
 
     // Handle ICE Candidates
@@ -124,23 +147,26 @@ export const LiveProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     await pc.setLocalDescription(offer);
     signaling.send('offer', offer, studentId);
 
-    // Handle Answer from Student
+    // Setup specific listeners for this student
+    // We create a wrapper to handle filtering by ID
     const answerHandler = async (answer: RTCSessionDescriptionInit, from: string) => {
         if(from !== studentId) return;
         try {
             if (pc.signalingState !== 'stable') {
                 await pc.setRemoteDescription(new RTCSessionDescription(answer));
             }
-        } catch(e) { console.error(e); }
+        } catch(e) { console.error("Teacher Answer Error", e); }
     };
     
     const candidateHandler = async (candidate: RTCIceCandidateInit, from: string) => {
         if(from !== studentId) return;
         try {
             await pc.addIceCandidate(new RTCIceCandidate(candidate));
-        } catch(e) { console.error(e); }
+        } catch(e) { console.error("Teacher Candidate Error", e); }
     }
 
+    // Note: In a real app, we need to manage cleaning these listeners up.
+    // For this simulation, we append.
     signaling.on('answer', answerHandler);
     signaling.on('candidate', candidateHandler);
   };
@@ -162,43 +188,89 @@ export const LiveProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     addSystemMessage("Class ended.");
   };
 
+  // --- MEDIA CONTROLS ---
+
+  const toggleMic = (enabled: boolean) => {
+    if (localStream) {
+      localStream.getAudioTracks().forEach(track => track.enabled = enabled);
+    }
+  };
+
+  const toggleCamera = (enabled: boolean) => {
+    if (localStream) {
+      localStream.getVideoTracks().forEach(track => track.enabled = enabled);
+    }
+  };
+
   // --- STUDENT / VIEWER LOGIC ---
 
   const joinSession = async () => {
-    // 1. Ask to join
-    signaling.send('join', {});
+    if (studentPeerConnection.current) return; // Already joined
 
-    // 2. Prepare PeerConnection
+    console.log("Student: Joining session...");
+    
+    // 1. Prepare PeerConnection
     const pc = new RTCPeerConnection(RTC_CONFIG);
     studentPeerConnection.current = pc;
+    pendingCandidates.current = [];
 
     pc.onicecandidate = (event) => {
       if (event.candidate) {
-        signaling.send('candidate', event.candidate); // Broadcast back to teacher (whoever is listening)
+        signaling.send('candidate', event.candidate); // Broadcast back to teacher
       }
     };
 
     pc.ontrack = (event) => {
-      console.log("Received Remote Stream");
+      console.log("Student: Received Remote Stream");
       setRemoteStream(event.streams[0]);
     };
 
-    // 3. Listen for Offer from Teacher
-    signaling.on('offer', async (offer, teacherId) => {
-      if (!studentPeerConnection.current) return;
-      
-      const pc = studentPeerConnection.current;
-      await pc.setRemoteDescription(new RTCSessionDescription(offer));
-      const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
-      signaling.send('answer', answer, teacherId);
-    });
+    // 2. Ask to join
+    signaling.send('join', {});
 
-    signaling.on('candidate', async (candidate) => {
-      if (studentPeerConnection.current) {
-        await studentPeerConnection.current.addIceCandidate(new RTCIceCandidate(candidate));
+    // 3. Listen for Offer from Teacher
+    // Remove old listeners to avoid dupes
+    signaling.off('offer', handleOffer);
+    signaling.on('offer', handleOffer);
+
+    signaling.off('candidate', handleCandidate);
+    signaling.on('candidate', handleCandidate);
+  };
+
+  const handleOffer = async (offer: RTCSessionDescriptionInit, teacherId: string) => {
+      const pc = studentPeerConnection.current;
+      if (!pc) return;
+      
+      console.log("Student: Received Offer");
+      try {
+        await pc.setRemoteDescription(new RTCSessionDescription(offer));
+        
+        // Process buffered candidates
+        while (pendingCandidates.current.length > 0) {
+            const c = pendingCandidates.current.shift();
+            if (c) await pc.addIceCandidate(new RTCIceCandidate(c));
+        }
+
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        signaling.send('answer', answer, teacherId);
+      } catch (e) {
+          console.error("Student Offer Error", e);
       }
-    });
+  };
+
+  const handleCandidate = async (candidate: RTCIceCandidateInit) => {
+      const pc = studentPeerConnection.current;
+      if (!pc) return;
+
+      try {
+          if (pc.remoteDescription) {
+             await pc.addIceCandidate(new RTCIceCandidate(candidate));
+          } else {
+             // Buffer if remote description not set yet
+             pendingCandidates.current.push(candidate);
+          }
+      } catch(e) { console.error("Student Candidate Error", e); }
   };
 
   const leaveSession = () => {
@@ -233,6 +305,7 @@ export const LiveProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       localStream, remoteStream,
       startSession, endSession, 
       joinSession, leaveSession,
+      toggleMic, toggleCamera,
       sendMessage, chatMessages 
     }}>
       {children}

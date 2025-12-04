@@ -274,7 +274,7 @@ export const TeacherReportsPage = () => {
 };
 
 export const LiveClassConsole = () => {
-    const { isLive, topic, viewerCount, startSession, endSession, sendMessage, chatMessages, localStream } = useLiveSession();
+    const { isLive, topic, viewerCount, startSession, endSession, sendMessage, chatMessages, localStream, toggleMic, toggleCamera } = useLiveSession();
     
     const [transcript, setTranscript] = useState("");
     const [summary, setSummary] = useState("");
@@ -327,7 +327,19 @@ export const LiveClassConsole = () => {
             sendMessage("Tanaka Sensei", newMessage);
             setNewMessage("");
         }
-    }
+    };
+
+    const handleToggleMic = () => {
+        const newState = !micOn;
+        setMicOn(newState);
+        toggleMic(newState);
+    };
+
+    const handleToggleCam = () => {
+        const newState = !camOn;
+        setCamOn(newState);
+        toggleCamera(newState);
+    };
 
     return (
         <div className="h-[calc(100vh-2rem)] flex flex-col space-y-4 animate-fade-in">
@@ -342,10 +354,10 @@ export const LiveClassConsole = () => {
                 
                 <div className="flex items-center gap-4">
                      <div className="flex bg-dark-900 rounded-lg p-1">
-                         <button onClick={() => setMicOn(!micOn)} className={`p-2 rounded ${micOn ? 'bg-dark-700 text-white' : 'text-red-500'}`}>
+                         <button onClick={handleToggleMic} className={`p-2 rounded ${micOn ? 'bg-dark-700 text-white' : 'text-red-500'}`}>
                              {micOn ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
                          </button>
-                         <button onClick={() => setCamOn(!camOn)} className={`p-2 rounded ${camOn ? 'bg-dark-700 text-white' : 'text-red-500'}`}>
+                         <button onClick={handleToggleCam} className={`p-2 rounded ${camOn ? 'bg-dark-700 text-white' : 'text-red-500'}`}>
                              {camOn ? <Camera className="w-5 h-5" /> : <CameraOff className="w-5 h-5" />}
                          </button>
                          <button className="p-2 rounded hover:bg-dark-700 text-gray-400">
