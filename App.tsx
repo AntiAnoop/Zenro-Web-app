@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
-import { BookOpen, BarChart2, ShieldAlert, Layout, LogOut, Play, User as UserIcon, Settings, MessageSquare, Video, CreditCard, Layers, Book, ListTodo, FileText, Globe } from 'lucide-react';
+import { BookOpen, BarChart2, ShieldAlert, Layout, LogOut, Play, User as UserIcon, Settings, MessageSquare, Video, CreditCard, Layers, Book, ListTodo, FileText, Globe, DollarSign, Users } from 'lucide-react';
 import { User, UserRole } from './types';
 import { ExamPortal } from './components/ExamPortal';
 import { StudentDashboardHome, StudentFeesPage, StudentProfilePage, StudentCoursesPage, StudentTestsPage, StudentActivityPage } from './components/StudentViews';
 import { TeacherDashboardHome, TeacherCoursesPage, TeacherAssignmentsPage, TeacherReportsPage, LiveClassConsole } from './components/TeacherViews';
+import { AdminDashboard, AdminUserManagement, AdminFinancials } from './components/AdminViews'; // Reusing TeacherCoursesPage or creating new if needed, using AdminViews exports
 
 // --- MOCK DATA ---
 const CREDENTIALS: Record<string, {pass: string, role: UserRole, name: string, id: string}> = {
@@ -120,6 +121,7 @@ const LoginScreen = ({ onLogin }: { onLogin: (user: User) => void }) => {
             <p>Demo Accounts:</p>
             <p>Student: 9999999999</p>
             <p>Sensei: 8888888888</p>
+            <p>Admin: 7777777777</p>
         </div>
       </div>
     </div>
@@ -196,6 +198,31 @@ const Sidebar = ({ user, onLogout }: { user: User, onLogout: () => void }) => {
              </Link>
            </>
         )}
+
+        {user.role === UserRole.ADMIN && (
+          <>
+             <Link to="/admin/dashboard" className={`flex items-center gap-3 px-4 py-3 rounded-r-lg transition-all ${isActive('/admin/dashboard')}`}>
+               <Layout className="w-5 h-5" />
+               Overview
+             </Link>
+             <Link to="/admin/users" className={`flex items-center gap-3 px-4 py-3 rounded-r-lg transition-all ${isActive('/admin/users')}`}>
+               <Users className="w-5 h-5" />
+               User Mgmt
+             </Link>
+             <Link to="/admin/courses" className={`flex items-center gap-3 px-4 py-3 rounded-r-lg transition-all ${isActive('/admin/courses')}`}>
+               <BookOpen className="w-5 h-5" />
+               Course Mgmt
+             </Link>
+             <Link to="/admin/finance" className={`flex items-center gap-3 px-4 py-3 rounded-r-lg transition-all ${isActive('/admin/finance')}`}>
+               <DollarSign className="w-5 h-5" />
+               Financials
+             </Link>
+             <Link to="/admin/settings" className={`flex items-center gap-3 px-4 py-3 rounded-r-lg transition-all ${isActive('/admin/settings')}`}>
+               <Settings className="w-5 h-5" />
+               Settings
+             </Link>
+          </>
+        )}
       </nav>
 
       <div className="p-4 border-t border-dark-800">
@@ -203,7 +230,7 @@ const Sidebar = ({ user, onLogout }: { user: User, onLogout: () => void }) => {
             <img src={user.avatar} alt="User" className="w-9 h-9 rounded-full bg-gray-700 border border-dark-600" />
             <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-white truncate">{user.name}</p>
-                <p className="text-xs text-gray-500 truncate capitalize">{user.role === UserRole.TEACHER ? 'Sensei' : 'Student'}</p>
+                <p className="text-xs text-gray-500 truncate capitalize">{user.role === UserRole.TEACHER ? 'Sensei' : user.role === UserRole.ADMIN ? 'Administrator' : 'Student'}</p>
             </div>
             <button onClick={onLogout} className="p-2 hover:bg-dark-800 rounded-full transition text-gray-500 hover:text-white" title="Logout">
                 <LogOut className="w-4 h-4" />
@@ -213,26 +240,6 @@ const Sidebar = ({ user, onLogout }: { user: User, onLogout: () => void }) => {
     </div>
   );
 };
-
-// 5. Admin Dashboard
-const AdminDashboard = () => (
-    <div className="p-8">
-        <h2 className="text-3xl font-bold text-white mb-8">Admin Overview</h2>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            {[
-                { label: 'Total Revenue', val: '¥12.4M', color: 'text-brand-500' },
-                { label: 'Active Students', val: '1,240', color: 'text-blue-500' },
-                { label: 'Live Classes', val: '5', color: 'text-red-500' },
-                { label: 'Pending Visas', val: '42', color: 'text-accent-gold' },
-            ].map((stat, i) => (
-                <div key={i} className="bg-dark-800 p-6 rounded-xl border border-dark-700">
-                    <p className="text-gray-400 text-sm uppercase tracking-wide">{stat.label}</p>
-                    <p className={`text-3xl font-bold mt-2 ${stat.color}`}>{stat.val}</p>
-                </div>
-            ))}
-        </div>
-    </div>
-);
 
 
 // --- MAIN APP COMPONENT ---
@@ -258,7 +265,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={
                user.role === UserRole.STUDENT ? <Navigate to="/student/dashboard" /> : 
-               user.role === UserRole.TEACHER ? <Navigate to="/teacher/dashboard" /> : <AdminDashboard />
+               user.role === UserRole.TEACHER ? <Navigate to="/teacher/dashboard" /> : <Navigate to="/admin/dashboard" />
             } />
             
             {/* Student Routes */}
@@ -289,7 +296,13 @@ export default function App() {
             <Route path="/teacher/reports" element={<TeacherReportsPage />} />
             <Route path="/teacher/live" element={<LiveClassConsole />} />
 
-            <Route path="/admin" element={<AdminDashboard />} />
+            {/* Admin Routes */}
+            <Route path="/admin/dashboard" element={<AdminDashboard />} />
+            <Route path="/admin/users" element={<AdminUserManagement />} />
+            <Route path="/admin/finance" element={<AdminFinancials />} />
+            <Route path="/admin/courses" element={<TeacherCoursesPage />} /> {/* Reusing for demo, ideally separate */}
+            <Route path="/admin/settings" element={<div className="text-center p-12 text-gray-500">Settings Module Loading...</div>} />
+
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </main>
