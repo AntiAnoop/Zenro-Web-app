@@ -1,6 +1,8 @@
-// This service mimics a WebSocket Signaling Server using the BroadcastChannel API.
-// This allows the app to function with Real WebRTC across multiple tabs without a Node.js backend.
-// In a real production app, replace 'BroadcastChannel' logic with 'socket.io-client'.
+import Pusher from 'pusher-js';
+
+// Configuration for Pusher Client
+const PUSHER_KEY = 'fcebfa171f05d2a752b2';
+const PUSHER_CLUSTER = 'ap2';
 
 type SignalType = 'login' | 'join' | 'offer' | 'answer' | 'candidate' | 'chat' | 'session_status' | 'get_status';
 
@@ -8,26 +10,37 @@ interface SignalMessage {
   type: SignalType;
   payload: any;
   from: string;
-  to?: string; // If undefined, broadcast to all
+  to?: string; 
 }
 
 class SignalingService {
-  private channel: BroadcastChannel;
+  private pusher: Pusher;
+  private channel: any;
   private userId: string;
   private listeners: Map<string, Function[]>;
 
   constructor() {
-    this.channel = new BroadcastChannel('zenro_live_signaling');
     this.userId = Math.random().toString(36).substring(7);
     this.listeners = new Map();
 
-    this.channel.onmessage = (event) => {
-      const msg = event.data as SignalMessage;
+    // Initialize Pusher
+    this.pusher = new Pusher(PUSHER_KEY, {
+      cluster: PUSHER_CLUSTER,
+      forceTLS: true
+    });
+
+    // Subscribe to the global class channel
+    this.channel = this.pusher.subscribe('live-class-channel');
+
+    // Bind to the generic 'signal-event' that carries all our messages
+    this.channel.bind('signal-event', (data: SignalMessage) => {
       // Filter messages meant for specific users
-      if (msg.to && msg.to !== this.userId) return;
-      
-      this.emitLocal(msg.type, msg.payload, msg.from);
-    };
+      if (data.to && data.to !== this.userId) return;
+      // Filter out messages sent by ourselves
+      if (data.from === this.userId) return;
+
+      this.emitLocal(data.type, data.payload, data.from);
+    });
   }
 
   public getMyId() {
@@ -38,14 +51,28 @@ class SignalingService {
     this.userId = id;
   }
 
-  public send(type: SignalType, payload: any, to?: string) {
+  // Instead of BroadcastChannel, we hit our Serverless API to trigger the event
+  public async send(type: SignalType, payload: any, to?: string) {
     const msg: SignalMessage = {
       type,
       payload,
       from: this.userId,
       to
     };
-    this.channel.postMessage(msg);
+
+    try {
+      await fetch('/api/signal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          channelName: 'live-class-channel',
+          eventName: 'signal-event',
+          data: msg
+        })
+      });
+    } catch (error) {
+      console.error("Failed to send signal:", error);
+    }
   }
 
   public on(event: SignalType, callback: (payload: any, from: string) => void) {

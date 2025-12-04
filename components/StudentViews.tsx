@@ -339,7 +339,7 @@ export const StudentLiveRoom = ({ user }: { user: User }) => {
 
     // Live UI
     return (
-        <div className="h-[calc(100vh-2rem)] flex gap-6 animate-fade-in">
+        <div className="h-[calc(100vh-2rem)] flex gap-6 animate-fade-in relative">
              <div className="flex-1 flex flex-col space-y-4">
                  <div className="relative flex-1 bg-black rounded-xl border border-dark-700 overflow-hidden shadow-2xl group">
                       {remoteStream ? (
@@ -347,7 +347,8 @@ export const StudentLiveRoom = ({ user }: { user: User }) => {
                              ref={remoteVideoRef} 
                              autoPlay 
                              playsInline 
-                             className="w-full h-full object-cover" 
+                             // FULL-SCREEN FOR STUDENTS: Changed from object-cover to fixed inset-0 z-10
+                             className="w-full h-full object-cover fixed inset-0 z-10 bg-black" 
                           />
                       ) : (
                           <div className="absolute inset-0 flex items-center justify-center text-gray-500">
@@ -358,7 +359,8 @@ export const StudentLiveRoom = ({ user }: { user: User }) => {
                           </div>
                       )}
                       
-                      <div className="absolute top-4 left-4 flex gap-2">
+                      {/* Controls Overlay - Positioned above video (z-20) */}
+                      <div className="absolute top-4 left-4 flex gap-2 z-20">
                            <div className="bg-red-600 text-white px-3 py-1 rounded text-xs font-bold flex items-center gap-2 shadow-lg">
                                 <span className="w-2 h-2 bg-white rounded-full animate-pulse"></span> LIVE
                            </div>
@@ -367,22 +369,24 @@ export const StudentLiveRoom = ({ user }: { user: User }) => {
                            </div>
                       </div>
                       
-                      {/* Controls Overlay */}
-                      <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/90 to-transparent opacity-0 group-hover:opacity-100 transition duration-300">
+                      {/* Info Overlay (z-20) */}
+                      <div className="absolute bottom-0 left-0 right-0 p-8 bg-gradient-to-t from-black/90 via-black/50 to-transparent opacity-0 group-hover:opacity-100 transition duration-300 z-20">
                            <div className="flex items-center justify-between">
                                 <div className="text-white">
-                                     <h3 className="font-bold">{topic}</h3>
-                                     <p className="text-xs text-gray-400">Tanaka Sensei</p>
+                                     <h3 className="font-bold text-2xl mb-1">{topic}</h3>
+                                     <p className="text-sm text-gray-300">Tanaka Sensei</p>
                                 </div>
                                 <div className="flex gap-4">
-                                     <button className="text-white hover:text-brand-500"><MicOff className="w-5 h-5" /></button>
-                                     <button className="text-white hover:text-brand-500"><Hand className="w-5 h-5" /></button>
+                                     <button className="bg-white/10 hover:bg-white/20 p-3 rounded-full text-white backdrop-blur-sm transition"><MicOff className="w-6 h-6" /></button>
+                                     <button className="bg-white/10 hover:bg-white/20 p-3 rounded-full text-white backdrop-blur-sm transition"><Hand className="w-6 h-6" /></button>
                                 </div>
                            </div>
                       </div>
                  </div>
                  
-                 <div className="bg-dark-800 p-4 rounded-xl border border-dark-700 flex justify-between items-center">
+                 {/* This bottom bar will be hidden under video if video is full screen fixed, 
+                     but we keep it for structure or if user exits full screen (future implementation) */}
+                 <div className="bg-dark-800 p-4 rounded-xl border border-dark-700 flex justify-between items-center relative z-0 hidden">
                      <div className="flex gap-4">
                          <button className="text-gray-400 hover:text-white text-sm font-bold flex items-center gap-2 bg-dark-900 px-4 py-2 rounded-lg"><Download className="w-4 h-4" /> Materials</button>
                          <button className="text-gray-400 hover:text-white text-sm font-bold flex items-center gap-2 bg-dark-900 px-4 py-2 rounded-lg"><AlertCircle className="w-4 h-4" /> Report Issue</button>
@@ -393,10 +397,11 @@ export const StudentLiveRoom = ({ user }: { user: User }) => {
                  </div>
              </div>
 
-             <div className="w-96 bg-dark-800 rounded-xl border border-dark-700 flex flex-col overflow-hidden shadow-lg">
-                 <div className="p-4 border-b border-dark-700 bg-dark-900/50 flex justify-between items-center">
+             {/* Chat Sidebar - Floats on top (z-30) */}
+             <div className="w-96 bg-dark-900/90 backdrop-blur-md border-l border-white/10 flex flex-col overflow-hidden shadow-2xl fixed right-0 top-0 bottom-0 z-30 transform translate-x-full group-hover:translate-x-0 transition duration-300">
+                 <div className="p-4 border-b border-white/10 bg-black/20 flex justify-between items-center pt-20">
                      <h3 className="font-bold text-white flex items-center gap-2"><MessageCircle className="w-4 h-4" /> Live Chat</h3>
-                     <span className="text-xs text-gray-500">Slow Mode On</span>
+                     <span className="text-xs text-gray-400">Slow Mode On</span>
                  </div>
                  
                  <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -406,23 +411,23 @@ export const StudentLiveRoom = ({ user }: { user: User }) => {
                                  <span className={`text-xs font-bold ${m.user === "Tanaka Sensei" ? 'text-brand-500' : m.user === user.name ? 'text-blue-400' : m.user === "SYSTEM" ? 'text-accent-gold' : 'text-gray-300'}`}>
                                      {m.user}
                                  </span>
-                                 <span className="text-[10px] text-gray-600">{m.timestamp}</span>
+                                 <span className="text-[10px] text-gray-500">{m.timestamp}</span>
                              </div>
-                             <p className={`text-sm rounded-lg p-2 ${m.user === "SYSTEM" ? 'bg-accent-gold/10 text-accent-gold text-xs italic' : 'bg-dark-900 text-gray-200'}`}>
+                             <p className={`text-sm rounded-lg p-2 ${m.user === "SYSTEM" ? 'bg-accent-gold/10 text-accent-gold text-xs italic' : 'bg-white/5 text-gray-200'}`}>
                                  {m.text}
                              </p>
                          </div>
                      ))}
                  </div>
 
-                 <form onSubmit={handleSend} className="p-4 bg-dark-900/50 border-t border-dark-700">
+                 <form onSubmit={handleSend} className="p-4 bg-black/20 border-t border-white/10">
                      <div className="relative">
                          <input 
                             type="text" 
                             value={message}
                             onChange={(e) => setMessage(e.target.value)}
                             placeholder="Ask a question..." 
-                            className="w-full bg-dark-900 border border-dark-600 text-white pl-4 pr-10 py-3 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none placeholder-gray-500 text-sm"
+                            className="w-full bg-white/5 border border-white/10 text-white pl-4 pr-10 py-3 rounded-xl focus:ring-1 focus:ring-brand-500 focus:outline-none placeholder-gray-500 text-sm"
                          />
                          <button type="submit" className="absolute right-2 top-2 p-1.5 bg-brand-600 hover:bg-brand-500 text-white rounded-lg transition">
                              <Send className="w-4 h-4" />
@@ -430,147 +435,178 @@ export const StudentLiveRoom = ({ user }: { user: User }) => {
                      </div>
                  </form>
              </div>
+             
+             {/* Floating Leave Button (z-40) */}
+             <button 
+                onClick={() => navigate('/student/courses')} 
+                className="fixed top-4 right-4 z-40 bg-red-600/80 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-bold text-sm backdrop-blur shadow-lg"
+             >
+                 Exit Class
+             </button>
         </div>
     );
 };
 
-export const StudentTestsPage = () => {
-    // Data for the graph (Most recent test)
-    const latestTest = MOCK_TESTS[0];
-    const graphData = [
-        { name: 'Me', score: latestTest.score, fill: '#be123c' },
-        { name: 'Class Avg', score: latestTest.classAverage, fill: '#64748b' },
-        { name: 'Topper', score: latestTest.topperScore, fill: '#C5A059' },
-    ];
+export const StudentFeesPage = () => {
+  const totalDue = MOCK_FEES.reduce((acc, fee) => acc + fee.amount, 0);
+  const totalPaid = MOCK_FEES.filter(f => f.status === 'PAID').reduce((acc, fee) => acc + fee.amount, 0);
+  const pendingAmount = totalDue - totalPaid;
 
+  return (
+    <div className="space-y-8 animate-fade-in">
+      <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+        <CreditCard className="w-8 h-8 text-accent-gold" /> Tuition & Fees
+      </h1>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-dark-800 p-6 rounded-xl border border-dark-700">
+           <p className="text-gray-400 text-sm font-semibold uppercase">Total Tuition (Phase 1+2)</p>
+           <h3 className="text-3xl font-bold text-white mt-2">¥{totalDue.toLocaleString()}</h3>
+        </div>
+        <div className="bg-dark-800 p-6 rounded-xl border border-dark-700">
+           <p className="text-gray-400 text-sm font-semibold uppercase">Paid Amount</p>
+           <h3 className="text-3xl font-bold text-brand-500 mt-2">¥{totalPaid.toLocaleString()}</h3>
+        </div>
+        <div className="bg-dark-800 p-6 rounded-xl border border-dark-700">
+           <p className="text-gray-400 text-sm font-semibold uppercase">Pending Due</p>
+           <h3 className="text-3xl font-bold text-red-500 mt-2">¥{pendingAmount.toLocaleString()}</h3>
+        </div>
+      </div>
+
+      <div className="bg-dark-800 rounded-xl border border-dark-700 overflow-hidden">
+        <div className="p-6 border-b border-dark-700">
+          <h3 className="font-bold text-white">Fee Breakdown</h3>
+        </div>
+        <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm text-gray-400">
+                <thead className="bg-dark-900 text-gray-200 uppercase font-bold text-xs">
+                    <tr>
+                        <th className="px-6 py-4">Title</th>
+                        <th className="px-6 py-4">Category</th>
+                        <th className="px-6 py-4">Due Date</th>
+                        <th className="px-6 py-4">Amount</th>
+                        <th className="px-6 py-4">Status</th>
+                        <th className="px-6 py-4 text-right">Action</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-dark-700">
+                    {MOCK_FEES.map((fee) => (
+                        <tr key={fee.id} className="hover:bg-dark-700/50 transition">
+                            <td className="px-6 py-4 font-medium text-white">{fee.title}</td>
+                            <td className="px-6 py-4">
+                                <span className="bg-dark-900 px-2 py-1 rounded border border-dark-600 text-xs">Phase {fee.phase}</span>
+                            </td>
+                            <td className="px-6 py-4">{fee.dueDate}</td>
+                            <td className="px-6 py-4 font-mono text-white">¥{fee.amount.toLocaleString()}</td>
+                            <td className="px-6 py-4"><StatusBadge status={fee.status} /></td>
+                            <td className="px-6 py-4 text-right">
+                                {fee.status !== 'PAID' && (
+                                    <button className="bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold px-3 py-1 rounded transition">
+                                        Pay Now
+                                    </button>
+                                )}
+                                {fee.status === 'PAID' && (
+                                    <button className="text-gray-500 hover:text-white text-xs flex items-center gap-1 ml-auto">
+                                        <Download className="w-3 h-3" /> Receipt
+                                    </button>
+                                )}
+                            </td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export const StudentTestsPage = () => {
     return (
         <div className="space-y-8 animate-fade-in">
-            <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-                <GraduationCap className="w-8 h-8 text-accent-gold" /> Performance & JLPT Mocks
-            </h1>
-            
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Performance Chart */}
-                <div className="lg:col-span-2 bg-dark-800 p-6 rounded-xl border border-dark-700">
-                    <h3 className="text-lg font-bold text-white mb-2">Score Analysis</h3>
-                    <p className="text-gray-400 text-sm mb-6">Comparative breakdown for {latestTest.title}</p>
-                    <div className="h-64 w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={graphData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                                <XAxis type="number" domain={[0, 180]} hide />
-                                <YAxis dataKey="name" type="category" stroke="#94a3b8" fontSize={12} width={80} />
-                                <Tooltip 
-                                    cursor={{fill: 'transparent'}}
-                                    contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', color: '#fff' }}
-                                />
-                                <Bar dataKey="score" radius={[0, 4, 4, 0]} barSize={32} />
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </div>
-                </div>
+             <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+                <FileText className="w-8 h-8 text-brand-500" /> JLPT Mock Results
+             </h1>
 
-                {/* Latest Score Card - Styled like a report card */}
-                <div className="bg-white text-dark-900 p-1 rounded-xl shadow-2xl">
-                    <div className="border-4 border-brand-500 rounded-lg p-6 h-full flex flex-col items-center justify-center text-center bg-[url('https://www.transparenttextures.com/patterns/rice-paper.png')]">
-                        <div className="text-brand-600 font-bold uppercase tracking-widest text-sm mb-2">JLPT N4 Mock</div>
-                        <div className="text-6xl font-bold text-dark-900 mb-2">{latestTest.score}</div>
-                        <div className="w-16 h-1 bg-brand-500 mb-4"></div>
-                        <p className="text-dark-700 font-medium">Total Score: {latestTest.totalScore}</p>
-                        <p className="text-sm text-gray-500 mt-4">"Excellent work! You are ready for the official exam."</p>
-                        <div className="mt-6 flex items-center gap-2 text-brand-600 font-bold">
-                             <CheckCircle className="w-5 h-5" /> PASSED
-                        </div>
-                    </div>
-                </div>
-            </div>
+             <div className="bg-dark-800 rounded-xl border border-dark-700 p-6">
+                 <h3 className="text-xl font-bold text-white mb-6">Performance Trend</h3>
+                 <div className="h-64 w-full">
+                     <ResponsiveContainer width="100%" height="100%">
+                         <BarChart data={MOCK_TESTS}>
+                             <XAxis dataKey="title" stroke="#94a3b8" hide />
+                             <YAxis stroke="#94a3b8" />
+                             <Tooltip 
+                                contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', color: '#fff' }}
+                                cursor={{fill: 'rgba(255,255,255,0.05)'}}
+                             />
+                             <Legend />
+                             <Bar dataKey="score" name="My Score" fill="#bc002d" radius={[4, 4, 0, 0]} barSize={40} />
+                             <Bar dataKey="classAverage" name="Class Avg" fill="#334155" radius={[4, 4, 0, 0]} barSize={40} />
+                         </BarChart>
+                     </ResponsiveContainer>
+                 </div>
+             </div>
 
-            {/* Test History */}
-            <div className="bg-dark-800 rounded-xl border border-dark-700 overflow-hidden">
-                <div className="p-6 border-b border-dark-700 flex justify-between items-center">
-                    <h3 className="text-lg font-bold text-white">Exam History</h3>
-                    <button className="text-sm text-brand-500 hover:text-white transition">Download All Reports</button>
-                </div>
-                <table className="w-full text-left text-sm text-gray-400">
-                    <thead className="bg-dark-900 text-gray-200 uppercase font-bold text-xs">
-                        <tr>
-                            <th className="px-6 py-4">Test Title</th>
-                            <th className="px-6 py-4">Date</th>
-                            <th className="px-6 py-4">Category</th>
-                            <th className="px-6 py-4">Score</th>
-                            <th className="px-6 py-4 text-right">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-dark-700">
-                        {MOCK_TESTS.map(test => (
-                            <tr key={test.id} className="hover:bg-dark-700/50 transition">
-                                <td className="px-6 py-4 font-medium text-white">{test.title}</td>
-                                <td className="px-6 py-4">{test.date}</td>
-                                <td className="px-6 py-4"><span className="bg-dark-700 px-2 py-1 rounded text-xs border border-dark-600">{test.subject}</span></td>
-                                <td className="px-6 py-4 text-white font-bold font-mono">{test.score}/{test.totalScore}</td>
-                                <td className="px-6 py-4 text-right">
-                                    <button className="text-brand-500 hover:text-brand-400 text-xs font-bold">VIEW REPORT</button>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
+             <div className="grid grid-cols-1 gap-4">
+                 {MOCK_TESTS.map(test => (
+                     <div key={test.id} className="bg-dark-800 p-6 rounded-xl border border-dark-700 flex flex-col md:flex-row items-center justify-between gap-4">
+                         <div className="flex items-center gap-4">
+                             <div className="p-4 bg-dark-900 rounded-lg text-center min-w-[80px]">
+                                 <h4 className="text-2xl font-bold text-white">{Math.round((test.score / test.totalScore) * 100)}%</h4>
+                                 <p className="text-xs text-gray-500">Score</p>
+                             </div>
+                             <div>
+                                 <h4 className="text-lg font-bold text-white">{test.title}</h4>
+                                 <p className="text-sm text-gray-400">{test.subject} • {test.date}</p>
+                             </div>
+                         </div>
+                         <div className="flex gap-8 text-sm text-gray-400">
+                             <div>
+                                 <p className="uppercase text-xs font-bold mb-1">Class Avg</p>
+                                 <p className="text-white">{test.classAverage}/{test.totalScore}</p>
+                             </div>
+                             <div>
+                                 <p className="uppercase text-xs font-bold mb-1">Topper</p>
+                                 <p className="text-brand-500">{test.topperScore}/{test.totalScore}</p>
+                             </div>
+                             <button className="bg-dark-700 hover:bg-dark-600 text-white px-4 py-2 rounded-lg self-center">
+                                 Analysis
+                             </button>
+                         </div>
+                     </div>
+                 ))}
+             </div>
         </div>
     );
 };
 
 export const StudentActivityPage = () => {
-    const [filter, setFilter] = useState<'PENDING' | 'COMPLETED'>('PENDING');
-    const filteredActivities = MOCK_ACTIVITIES.filter(a => a.status === filter);
-
     return (
         <div className="space-y-8 animate-fade-in">
-             <div className="flex items-center justify-between">
-                <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-                   <Activity className="w-8 h-8 text-brand-500" /> Practice & Assignments
-                </h1>
-                <div className="flex bg-dark-800 rounded-lg p-1 border border-dark-700">
-                    <button 
-                        onClick={() => setFilter('PENDING')}
-                        className={`px-4 py-2 rounded-md text-sm font-bold transition ${filter === 'PENDING' ? 'bg-brand-600 text-white shadow' : 'text-gray-400 hover:text-white'}`}
-                    >
-                        Pending
-                    </button>
-                    <button 
-                        onClick={() => setFilter('COMPLETED')}
-                        className={`px-4 py-2 rounded-md text-sm font-bold transition ${filter === 'COMPLETED' ? 'bg-brand-900 text-white shadow border border-brand-500' : 'text-gray-400 hover:text-white'}`}
-                    >
-                        Completed
-                    </button>
-                </div>
-            </div>
+            <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+                <ListTodo className="w-8 h-8 text-blue-500" /> Activities & Assignments
+            </h1>
 
             <div className="grid grid-cols-1 gap-4">
-                {filteredActivities.length === 0 && (
-                    <div className="text-center py-12 text-gray-500">
-                        <CheckCircle className="w-12 h-12 mx-auto mb-4 opacity-20" />
-                        <p>No {filter.toLowerCase()} activities found.</p>
-                    </div>
-                )}
-                {filteredActivities.map(act => (
-                    <div key={act.id} className="bg-dark-800 p-6 rounded-xl border border-dark-700 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                        <div className="flex items-start gap-4">
-                            <div className={`p-3 rounded-lg ${act.type === 'ASSIGNMENT' ? 'bg-brand-500/20 text-brand-500' : act.type === 'QUIZ' ? 'bg-blue-500/20 text-blue-500' : 'bg-purple-500/20 text-purple-500'}`}>
-                                {act.type === 'ASSIGNMENT' ? <FileText className="w-6 h-6" /> : act.type === 'QUIZ' ? <AlertCircle className="w-6 h-6" /> : <Languages className="w-6 h-6" />}
-                            </div>
-                            <div>
-                                <h3 className="text-lg font-bold text-white">{act.title}</h3>
-                                <p className="text-gray-400 text-sm">{act.courseName} • <span className={act.status === 'PENDING' ? 'text-red-400' : 'text-green-500'}>Due: {act.dueDate}</span></p>
-                            </div>
+                {MOCK_ACTIVITIES.map(activity => (
+                    <div key={activity.id} className={`bg-dark-800 p-6 rounded-xl border ${activity.status === 'PENDING' ? 'border-brand-500/50' : 'border-dark-700'} flex justify-between items-center`}>
+                        <div className="flex items-center gap-4">
+                             <div className={`p-3 rounded-full ${activity.type === 'ASSIGNMENT' ? 'bg-blue-500/20 text-blue-500' : activity.type === 'QUIZ' ? 'bg-purple-500/20 text-purple-500' : 'bg-green-500/20 text-green-500'}`}>
+                                 {activity.type === 'ASSIGNMENT' ? <FileText className="w-6 h-6" /> : activity.type === 'QUIZ' ? <AlertCircle className="w-6 h-6" /> : <Briefcase className="w-6 h-6" />}
+                             </div>
+                             <div>
+                                 <h4 className="text-lg font-bold text-white">{activity.title}</h4>
+                                 <p className="text-sm text-gray-400">{activity.courseName} • Due: {activity.dueDate}</p>
+                             </div>
                         </div>
                         <div>
-                             {act.status === 'PENDING' ? (
-                                 <button className="bg-brand-600 hover:bg-brand-500 text-white px-6 py-2 rounded-lg font-bold text-sm transition">
+                             {activity.status === 'PENDING' ? (
+                                 <button className="bg-brand-600 hover:bg-brand-500 text-white px-6 py-2 rounded-lg font-bold shadow-lg shadow-brand-900/30">
                                      Start Now
                                  </button>
                              ) : (
-                                 <div className="flex items-center gap-2 text-green-500 font-bold text-sm bg-green-500/10 px-4 py-2 rounded-lg">
-                                     <CheckCircle className="w-4 h-4" /> Submitted
+                                 <div className="flex items-center gap-2 text-green-500 font-bold px-4">
+                                     <CheckCircle className="w-5 h-5" /> Completed
                                  </div>
                              )}
                         </div>
@@ -579,211 +615,87 @@ export const StudentActivityPage = () => {
             </div>
         </div>
     );
-}
-
-export const StudentFeesPage = () => {
-  const totalTrainingFee = 200000;
-  const phase1Fees = MOCK_FEES.filter(f => f.phase === 1);
-  const phase2Fees = MOCK_FEES.filter(f => f.phase === 2);
-  
-  const totalPaid = MOCK_FEES.filter(f => f.status === 'PAID').reduce((acc, f) => acc + f.amount, 0);
-  const totalDue = totalTrainingFee - totalPaid;
-  
-  const isPhase1Complete = phase1Fees.every(f => f.status === 'PAID');
-
-  const FeeTable = ({ title, subTitle, fees, isLocked, icon: Icon }: { title: string, subTitle: string, fees: FeeRecord[], isLocked?: boolean, icon: any }) => (
-    <div className={`bg-dark-800 rounded-xl border border-dark-700 overflow-hidden mb-8 relative ${isLocked ? 'opacity-70' : ''} shadow-lg`}>
-        {isLocked && (
-            <div className="absolute inset-0 z-20 bg-dark-900/80 backdrop-blur-sm flex flex-col items-center justify-center text-center p-6">
-                <Lock className="w-16 h-16 text-gray-500 mb-4" />
-                <h3 className="text-xl font-bold text-white">Phase Locked</h3>
-                <p className="text-gray-400 max-w-sm mt-2">Complete "Domestic Training" payments to unlock the Placement Success fee structure.</p>
-            </div>
-        )}
-        <div className="p-6 border-b border-dark-700 bg-gradient-to-r from-dark-900 to-dark-800 flex justify-between items-center">
-            <div className="flex items-center gap-4">
-                <div className="bg-brand-900/50 p-3 rounded-lg border border-brand-500/30">
-                    <Icon className="w-6 h-6 text-brand-500" />
-                </div>
-                <div>
-                    <h3 className="text-lg font-bold text-white">{title}</h3>
-                    <p className="text-sm text-gray-400">{subTitle}</p>
-                </div>
-            </div>
-            {!isLocked && fees.some(f => f.status === 'OVERDUE') && (
-                <span className="flex items-center gap-1 text-xs text-red-500 font-bold bg-red-500/10 px-3 py-1.5 rounded-full border border-red-500/20">
-                    <AlertCircle className="w-3 h-3" /> Payment Overdue
-                </span>
-            )}
-        </div>
-        <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm text-gray-400">
-                <thead className="bg-dark-900 text-gray-200 uppercase font-bold text-xs">
-                    <tr>
-                        <th className="px-6 py-4">Installment</th>
-                        <th className="px-6 py-4">Due Date</th>
-                        <th className="px-6 py-4">Amount</th>
-                        <th className="px-6 py-4">Status</th>
-                        <th className="px-6 py-4 text-right">Action</th>
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-dark-700">
-                    {fees.map((fee) => (
-                        <tr key={fee.id} className="hover:bg-dark-700/50 transition">
-                            <td className="px-6 py-4 font-medium text-white">{fee.title}</td>
-                            <td className="px-6 py-4">{fee.dueDate}</td>
-                            <td className="px-6 py-4 text-white font-mono">¥{fee.amount.toLocaleString()}</td>
-                            <td className="px-6 py-4">
-                                <StatusBadge status={fee.status} />
-                            </td>
-                            <td className="px-6 py-4 text-right">
-                                {fee.status !== 'PAID' && !isLocked ? (
-                                    <button className="text-brand-500 hover:text-white font-bold text-xs border border-brand-500 hover:bg-brand-600 px-3 py-1.5 rounded transition">
-                                        PAY NOW
-                                    </button>
-                                ) : fee.status === 'PAID' ? (
-                                    <button className="text-gray-500 hover:text-white flex items-center gap-1 text-xs ml-auto">
-                                        <Download className="w-3 h-3" /> Receipt
-                                    </button>
-                                ) : (
-                                    <span className="text-gray-600 text-xs">Locked</span>
-                                )}
-                            </td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-        </div>
-    </div>
-  );
-
-  return (
-    <div className="space-y-8 animate-fade-in max-w-6xl mx-auto">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-           <h2 className="text-3xl font-bold text-white flex items-center gap-3">
-              <Briefcase className="w-8 h-8 text-brand-500" /> Career Investment Plan
-           </h2>
-           <p className="text-gray-400 mt-1">Total Program Fee: <span className="text-white font-bold">¥200,000</span> (approx.)</p>
-        </div>
-        <button className="bg-white hover:bg-gray-100 text-brand-900 px-6 py-3 rounded-lg font-bold flex items-center gap-2 shadow-lg">
-            <Download className="w-5 h-5" /> Download Fee Schedule
-        </button>
-      </div>
-
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-dark-800 p-6 rounded-xl border border-dark-700 relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-4 opacity-10"><AlertCircle className="w-16 h-16 text-red-500" /></div>
-            <p className="text-gray-400 text-sm uppercase font-bold mb-1 tracking-wider">Outstanding Balance</p>
-            <p className="text-3xl font-bold text-white">¥{totalDue.toLocaleString()}</p>
-        </div>
-        <div className="bg-dark-800 p-6 rounded-xl border border-dark-700 relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-4 opacity-10"><CheckCircle className="w-16 h-16 text-brand-500" /></div>
-            <p className="text-gray-400 text-sm uppercase font-bold mb-1 tracking-wider">Total Invested</p>
-            <p className="text-3xl font-bold text-white">¥{totalPaid.toLocaleString()}</p>
-            <div className="mt-4 text-xs text-brand-500 flex items-center gap-1 font-bold">
-                {Math.round((totalPaid / totalTrainingFee) * 100)}% of total fee
-            </div>
-        </div>
-        <div className="bg-gradient-to-br from-brand-900 to-dark-800 p-6 rounded-xl border border-brand-500/20 shadow-lg">
-             <p className="text-brand-100 text-sm uppercase font-bold mb-1 tracking-wider">Current Status</p>
-             <p className="text-2xl font-bold text-white">Phase 1: Domestic Training</p>
-             <p className="text-sm text-brand-200 mt-1 flex items-center gap-2"><Zap className="w-3 h-3" /> JLPT N4 In Progress</p>
-        </div>
-      </div>
-
-      <div className="space-y-8">
-        {/* Phase 1 Table */}
-        <FeeTable 
-            title="PHASE 1: Domestic Training" 
-            subTitle="N5-N3 Language & Cultural Training (¥50,000)"
-            fees={phase1Fees} 
-            icon={Languages}
-        />
-
-        {/* Phase 2 Table */}
-        <FeeTable 
-            title="PHASE 2: Global Success" 
-            subTitle="Placement, Visa & Relocation Support (¥1,50,000)"
-            fees={phase2Fees} 
-            isLocked={!isPhase1Complete} 
-            icon={Globe}
-        />
-      </div>
-    </div>
-  );
 };
 
 export const StudentProfilePage = ({ user }: { user: User }) => {
     return (
-        <div className="max-w-5xl mx-auto space-y-8 animate-fade-in">
-             <div className="relative h-48 bg-gradient-to-r from-brand-900 to-dark-800 rounded-2xl overflow-hidden border border-dark-700">
-                 <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/seigaiha.png')] opacity-10"></div>
-                 <div className="absolute -bottom-12 left-8 flex items-end gap-6">
-                     <div className="w-32 h-32 rounded-full border-4 border-dark-900 bg-dark-800 overflow-hidden shadow-2xl">
-                         <img src={user.avatar} alt="Profile" className="w-full h-full object-cover" />
-                     </div>
-                     <div className="mb-14">
-                         <h1 className="text-3xl font-bold text-white font-sans">{user.name}</h1>
-                         <p className="text-brand-200 font-medium">JLPT N4 Aspirant • Batch 2024</p>
-                     </div>
-                 </div>
-             </div>
+        <div className="max-w-4xl mx-auto space-y-8 animate-fade-in">
+            <h1 className="text-3xl font-bold text-white flex items-center gap-3">
+                <UserIcon className="w-8 h-8 text-gray-400" /> My Profile
+            </h1>
 
-             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pt-12">
-                 {/* Left Col: Contact Info */}
-                 <div className="space-y-6">
-                     <div className="bg-dark-800 p-6 rounded-xl border border-dark-700">
-                         <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                             <UserIcon className="w-5 h-5 text-brand-500" /> Personal Details
-                         </h3>
-                         <div className="space-y-4">
-                             <div>
-                                 <label className="text-xs text-gray-500 uppercase font-bold tracking-wider">Full Name</label>
-                                 <p className="text-gray-300">{user.name}</p>
-                             </div>
-                             <div>
-                                 <label className="text-xs text-gray-500 uppercase font-bold tracking-wider">Student ID</label>
-                                 <p className="text-gray-300 font-mono">ZEN-2024-0042</p>
-                             </div>
-                             <div>
-                                 <label className="text-xs text-gray-500 uppercase font-bold tracking-wider">JLPT Target</label>
-                                 <p className="text-brand-400 font-bold">N3 by Dec 2024</p>
-                             </div>
-                         </div>
-                     </div>
-                 </div>
+            <div className="bg-dark-800 rounded-xl border border-dark-700 overflow-hidden">
+                <div className="h-32 bg-gradient-to-r from-brand-900 to-dark-900"></div>
+                <div className="px-8 pb-8">
+                    <div className="relative -mt-16 mb-6 flex justify-between items-end">
+                        <img src={user.avatar} alt={user.name} className="w-32 h-32 rounded-full border-4 border-dark-800 bg-dark-900" />
+                        <button className="bg-dark-700 hover:bg-dark-600 text-white px-4 py-2 rounded-lg text-sm font-bold border border-dark-600">
+                            Edit Profile
+                        </button>
+                    </div>
+                    
+                    <h2 className="text-3xl font-bold text-white">{user.name}</h2>
+                    <p className="text-gray-400">{user.email}</p>
+                    <div className="flex gap-3 mt-4">
+                        <span className="bg-brand-500/20 text-brand-500 px-3 py-1 rounded text-xs font-bold uppercase border border-brand-500/30">
+                            {user.role}
+                        </span>
+                        <span className="bg-blue-500/20 text-blue-500 px-3 py-1 rounded text-xs font-bold uppercase border border-blue-500/30">
+                            Batch 2024-A
+                        </span>
+                    </div>
+                </div>
+            </div>
 
-                 {/* Right Col: Editable Contact & Settings */}
-                 <div className="lg:col-span-2 space-y-6">
-                     <div className="bg-dark-800 p-6 rounded-xl border border-dark-700">
-                         <div className="flex justify-between items-center mb-6">
-                             <h3 className="text-lg font-bold text-white">Contact Information</h3>
-                             <button className="text-sm text-brand-500 hover:text-white border border-brand-500/50 hover:bg-brand-600 px-3 py-1 rounded transition">Edit Details</button>
-                         </div>
-                         
-                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                             <div className="flex items-start gap-3 p-4 bg-dark-900 rounded-lg border border-dark-700 hover:border-brand-500/30 transition">
-                                 <Mail className="w-5 h-5 text-gray-400 mt-1" />
-                                 <div>
-                                     <p className="text-sm font-bold text-white">Email Address</p>
-                                     <p className="text-sm text-gray-400">{user.email}</p>
-                                     <span className="inline-block mt-2 text-[10px] bg-brand-500/20 text-brand-500 px-2 py-0.5 rounded border border-brand-500/20">VERIFIED</span>
-                                 </div>
-                             </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="bg-dark-800 p-6 rounded-xl border border-dark-700 space-y-4">
+                    <h3 className="text-lg font-bold text-white border-b border-dark-700 pb-2">Personal Information</h3>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                            <p className="text-gray-500">Full Name</p>
+                            <p className="text-white font-medium">{user.name}</p>
+                        </div>
+                        <div>
+                            <p className="text-gray-500">Date of Birth</p>
+                            <p className="text-white font-medium">1999-05-15</p>
+                        </div>
+                        <div>
+                            <p className="text-gray-500">Phone</p>
+                            <p className="text-white font-medium">+91 98765 43210</p>
+                        </div>
+                        <div>
+                            <p className="text-gray-500">Gender</p>
+                            <p className="text-white font-medium">Male</p>
+                        </div>
+                        <div className="col-span-2">
+                             <p className="text-gray-500">Address</p>
+                             <p className="text-white font-medium">123, Tech Park Road, Bangalore, India</p>
+                        </div>
+                    </div>
+                </div>
 
-                             <div className="flex items-start gap-3 p-4 bg-dark-900 rounded-lg border border-dark-700 hover:border-brand-500/30 transition">
-                                 <Phone className="w-5 h-5 text-gray-400 mt-1" />
-                                 <div>
-                                     <p className="text-sm font-bold text-white">Phone Number</p>
-                                     <p className="text-sm text-gray-400">+1 (555) 987-6543</p>
-                                 </div>
-                             </div>
-                         </div>
-                     </div>
-                 </div>
-             </div>
+                <div className="bg-dark-800 p-6 rounded-xl border border-dark-700 space-y-4">
+                    <h3 className="text-lg font-bold text-white border-b border-dark-700 pb-2">Academic & Guardian</h3>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                             <p className="text-gray-500">Guardian Name</p>
+                             <p className="text-white font-medium">Mr. Parent</p>
+                        </div>
+                        <div>
+                             <p className="text-gray-500">Relationship</p>
+                             <p className="text-white font-medium">Father</p>
+                        </div>
+                        <div>
+                             <p className="text-gray-500">Emergency Contact</p>
+                             <p className="text-white font-medium">+91 98765 00000</p>
+                        </div>
+                         <div>
+                             <p className="text-gray-500">Previous Education</p>
+                             <p className="text-white font-medium">B.Tech (CS)</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     );
-}
+};

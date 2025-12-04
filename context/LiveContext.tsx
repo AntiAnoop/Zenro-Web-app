@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { signaling } from '../services/signaling';
-import { UserRole } from '../types';
+import { User, UserRole } from '../types';
 
 interface LiveSessionState {
   isLive: boolean;
@@ -28,7 +28,12 @@ const RTC_CONFIG = {
   ]
 };
 
-export const LiveProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+interface LiveProviderProps {
+  children: ReactNode;
+  user: User | null;
+}
+
+export const LiveProvider: React.FC<LiveProviderProps> = ({ children, user }) => {
   const [isLive, setIsLive] = useState(false);
   const [topic, setTopic] = useState("Waiting for class...");
   const [viewerCount, setViewerCount] = useState(0);
@@ -43,8 +48,7 @@ export const LiveProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const studentPeerConnection = useRef<RTCPeerConnection | null>(null); // Student: single PC to teacher
   const pendingCandidates = useRef<RTCIceCandidateInit[]>([]); // Buffer for candidates arriving before remote desc
 
-  // State to track if we are the broadcaster
-  const isBroadcaster = useRef(false);
+  const isTeacher = user?.role === UserRole.TEACHER;
 
   useEffect(() => {
     // Global Signal Listeners
@@ -56,8 +60,9 @@ export const LiveProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     // 2. Handle Session Status Updates
     signaling.on('session_status', (payload) => {
-      // If we are broadcaster, ignore our own broadcasts
-      if (isBroadcaster.current) return;
+      // If we are the teacher (broadcaster), ignore our own status broadcasts 
+      // to avoid resetting state based on echoed messages.
+      if (isTeacher && isLive) return;
 
       setIsLive(payload.isLive);
       setTopic(payload.topic);
@@ -74,27 +79,30 @@ export const LiveProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     // 3. Handle Status Requests (New student joins and asks "Are we live?")
     signaling.on('get_status', (payload, from) => {
-      if (isBroadcaster.current && isLive) {
+      if (isTeacher && isLive) {
         signaling.send('session_status', { isLive: true, topic }, from);
       }
     });
 
     // Ask for status on mount (in case we refreshed student tab)
-    signaling.send('get_status', {});
+    if (!isTeacher) {
+      signaling.send('get_status', {});
+    }
 
     return () => {
-      // Clean up is complex in React.StrictMode, relying on explicit endSession/leaveSession
+      // Clean up handled via role logic usually
     };
-  }, [isLive, topic]);
+  }, [isLive, topic, isTeacher]);
 
   // --- TEACHER / BROADCASTER LOGIC ---
 
   const startSession = async (newTopic: string) => {
+    if (!isTeacher) return;
+
     try {
       // 1. Get User Media
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       setLocalStream(stream);
-      isBroadcaster.current = true;
 
       // 2. Update Local State
       setTopic(newTopic);
@@ -106,7 +114,6 @@ export const LiveProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       signaling.send('session_status', { isLive: true, topic: newTopic });
 
       // 4. Setup Listener for Join Requests
-      // We remove old listeners to prevent duplicates if startSession is called multiple times
       signaling.off('join', handleJoinRequest); 
       signaling.on('join', handleJoinRequest);
 
@@ -148,7 +155,6 @@ export const LiveProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     signaling.send('offer', offer, studentId);
 
     // Setup specific listeners for this student
-    // We create a wrapper to handle filtering by ID
     const answerHandler = async (answer: RTCSessionDescriptionInit, from: string) => {
         if(from !== studentId) return;
         try {
@@ -165,14 +171,12 @@ export const LiveProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         } catch(e) { console.error("Teacher Candidate Error", e); }
     }
 
-    // Note: In a real app, we need to manage cleaning these listeners up.
-    // For this simulation, we append.
     signaling.on('answer', answerHandler);
     signaling.on('candidate', candidateHandler);
   };
 
   const endSession = () => {
-    isBroadcaster.current = false;
+    if (!isTeacher) return;
     setIsLive(false);
     
     // Close all connections
@@ -191,12 +195,18 @@ export const LiveProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // --- MEDIA CONTROLS ---
 
   const toggleMic = (enabled: boolean) => {
+    // SECURITY: Only teacher can toggle broadcasting mic
+    if (!isTeacher) return;
+
     if (localStream) {
       localStream.getAudioTracks().forEach(track => track.enabled = enabled);
     }
   };
 
   const toggleCamera = (enabled: boolean) => {
+    // SECURITY: Only teacher can toggle broadcasting camera
+    if (!isTeacher) return;
+
     if (localStream) {
       localStream.getVideoTracks().forEach(track => track.enabled = enabled);
     }
@@ -229,7 +239,6 @@ export const LiveProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     signaling.send('join', {});
 
     // 3. Listen for Offer from Teacher
-    // Remove old listeners to avoid dupes
     signaling.off('offer', handleOffer);
     signaling.on('offer', handleOffer);
 

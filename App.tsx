@@ -259,7 +259,7 @@ export default function App() {
   }
 
   return (
-    <LiveProvider>
+    <LiveProvider user={user}>
       <Router>
         <div className="flex h-screen bg-dark-900 text-white font-sans selection:bg-brand-500 selection:text-white">
           <Sidebar user={user} onLogout={() => setUser(null)} />
