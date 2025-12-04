@@ -1,0 +1,8 @@
+{
+  "name": "Copy of EduNexus - AI Learning Platform",
+  "description": "A production-grade LMS featuring Netflix-style student dashboards, anti-cheat exam interfaces, and AI-driven teacher tools.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
